@@ -27,7 +27,7 @@
 | `01-research/01-benchmark-report.html` | 同上（HTML 演示版） | accepted | 2026-10-24 |
 | `02-business-design/01-domain-model.md` | 业务建模：领域模型与业务规则 | draft（待评审） | 2026-10-24 |
 | `02-business-design/02-interaction-flows.md` | 交互链路设计 | draft（待评审） | 2026-10-24 |
-| `02-business-design/03-clickable-prototype.html` | 可点击交互原型（Keep 风格暗色，覆盖关键页面与操作流） | draft（随 02 评审） | 2026-10-24 |
+| `02-business-design/03-clickable-prototype.html` | 可点击交互原型（Keep 风格亮色版，覆盖关键页面与操作流） | draft（随 02 评审） | 2026-10-24 |
 
 ## 3. 命名与编号规范
 
