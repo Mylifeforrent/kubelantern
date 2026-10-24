@@ -1,0 +1,1037 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HuntAI SRE · 可点击交互原型</title>
+<!-- 依据: docs/02-business-design/01-domain-model.md 与 02-interaction-flows.md §4（关键页面与关键操作流）
+     视觉基准: keephq.dev 官方暗色设计令牌（仅做密度/对比度微调）。全部数据为虚构演示数据。
+     单文件原型：无构建依赖，浏览器直接打开；正式前端实现遵循项目冻结技术栈（React+TS+Vite+Tailwind+shadcn/ui）。 -->
+</head>
+<body>
+<meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ===== HuntAI SRE 可点击原型 — 设计令牌基于 keephq.dev 官方色板，仅做密度/对比度微调 ===== */
+#hp{
+  /* Keep 官方暗色令牌（cdn.prod.website-files.com/.../keep-hq.webflow.shared.css） */
+  --bg:#0b0c0d;            /* black-10 主背景 */
+  --surface:#101112;       /* alt-bg-black 卡片 */
+  --surface-2:#191a1e;     /* black-20 悬浮/激活 */
+  --surface-3:#222325;     /* black-30 边框/交替 */
+  --raise:#3d3d3f;         /* black-40 */
+  --tx-dim:#5a5a5b;        /* black-50 */
+  --tx-2:#808083;          /* black-60 次要文字 */
+  --tx-3:#a9a9ab;          /* black-70 */
+  --tx:#d3d6d8;            /* white-70 正文（dark--text-primary） */
+  --tx-hi:#fefeff;         /* white-10 标题 */
+  --brand:#c53520;         /* brand-20 主按钮 */
+  --brand-h:#e6522c;       /* brand-30 hover */
+  --brand-t:#f0865e;       /* brand-40 文本级 */
+  --brand-w:#f7a97f;       /* brand-50 */
+  --red:#ff1f47; --red-t:#ff6681;
+  --green:#09e488; --green-t:#5cfcb9;
+  --teal:#00d1ff; --teal-t:#56e0ff;
+  --purple:#b236ff; --purple-t:#c972ff;
+  --gold:#f2cc60;
+  /* skill 微调：密度 8/10 间距节奏 + 语义半径 */
+  --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:24px; --s6:32px;
+  --r-s:8px; --r-m:12px; --r-l:14px;
+  --font:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;
+  --mono:ui-monospace,'SF Mono',SFMono-Regular,Menlo,Consolas,'Liberation Mono',monospace;
+  height:900px; position:relative; overflow:hidden;
+  display:flex; background:var(--bg); color:var(--tx);
+  font:400 14px/1.55 var(--font); text-align:left;
+  border:1px solid var(--surface-3); border-radius:var(--r-l);
+}
+#hp *,#hp *::before,#hp *::after{box-sizing:border-box;margin:0;padding:0}
+#hp .ic{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none;vertical-align:-3px}
+#hp ::selection{background:rgba(197,53,32,.45)}
+#hp ::-webkit-scrollbar{width:10px;height:10px}
+#hp ::-webkit-scrollbar-thumb{background:#26272b;border-radius:6px;border:3px solid var(--bg)}
+#hp :focus-visible{outline:2px solid var(--purple);outline-offset:2px;border-radius:4px}
+#hp button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+#hp a{color:var(--teal-t);text-decoration:none}
+#hp a:hover{text-decoration:underline}
+@media (prefers-reduced-motion:reduce){
+  #hp *,#hp *::before,#hp *::after{animation:none!important;transition:none!important}
+}
+
+/* ===== 布局骨架 ===== */
+#hp .side{width:228px;flex:none;background:var(--bg);border-right:1px solid var(--surface-3);display:flex;flex-direction:column}
+#hp .main{flex:1;min-width:0;display:flex;flex-direction:column}
+#hp .topbar{height:52px;flex:none;display:flex;align-items:center;gap:var(--s3);padding:0 var(--s4);border-bottom:1px solid var(--surface-3);background:var(--bg)}
+#hp .content{flex:1;overflow-y:auto;padding:var(--s5) var(--s5) var(--s6)}
+
+/* ===== 侧栏 ===== */
+#hp .logo{display:flex;align-items:center;gap:10px;padding:14px 16px 12px}
+#hp .logo-mark{width:30px;height:30px;border-radius:9px;flex:none;display:grid;place-items:center;
+  background:linear-gradient(135deg,#e6522c,#c53520 55%,#8f1e12);color:#fff;box-shadow:0 2px 10px rgba(197,53,32,.35)}
+#hp .logo-mark .ic{width:17px;height:17px;stroke-width:2}
+#hp .logo b{font-size:14.5px;color:var(--tx-hi);letter-spacing:.2px}
+#hp .logo small{display:block;font-size:10.5px;color:var(--tx-2);line-height:1.2}
+#hp .navgrp{padding:10px 16px 4px;font-size:10.5px;letter-spacing:.14em;color:var(--tx-dim);text-transform:uppercase}
+#hp .nav{display:flex;align-items:center;gap:10px;width:calc(100% - 16px);margin:1px 8px;padding:7px 10px;border-radius:var(--r-s);color:var(--tx-3);font-size:13.5px;transition:background .15s,color .15s}
+#hp .nav:hover{background:var(--surface-2);color:var(--tx)}
+#hp .nav.on{background:var(--surface-2);color:var(--tx-hi);box-shadow:inset 2.5px 0 0 var(--brand)}
+#hp .nav .ic{color:var(--tx-2)}
+#hp .nav.on .ic{color:var(--brand-t)}
+#hp .nav .tag{margin-left:auto}
+#hp .bdg{margin-left:auto;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--brand);color:#fff;font-size:10.5px;font-weight:600;display:grid;place-items:center;font-variant-numeric:tabular-nums}
+#hp .bdg.pu{background:var(--purple)}
+#hp .side-foot{margin-top:auto;padding:12px 16px;border-top:1px solid var(--surface-3);font-size:11px;color:var(--tx-dim);display:flex;align-items:center;gap:8px}
+#hp .side-foot .dot-ok{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 6px rgba(9,228,136,.7)}
+
+/* ===== 顶栏 ===== */
+#hp .env{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 9px;border-radius:6px;background:rgba(0,209,255,.08);border:1px solid rgba(0,209,255,.25);color:var(--teal-t);font-size:11.5px}
+#hp .gsearch{display:flex;align-items:center;gap:8px;width:300px;height:32px;padding:0 10px;border-radius:var(--r-s);background:var(--surface);border:1px solid var(--surface-3);color:var(--tx-2)}
+#hp .gsearch input{flex:1;background:none;border:none;outline:none;color:var(--tx-hi);font:inherit;font-size:13px}
+#hp .gsearch input::placeholder{color:var(--tx-dim)}
+#hp .iconbtn{position:relative;width:32px;height:32px;border-radius:var(--r-s);display:grid;place-items:center;color:var(--tx-2);transition:background .15s,color .15s}
+#hp .iconbtn:hover{background:var(--surface-2);color:var(--tx)}
+#hp .iconbtn .pip{position:absolute;top:4px;right:4px;min-width:14px;height:14px;padding:0 3px;border-radius:7px;background:var(--brand);color:#fff;font-size:9.5px;font-weight:700;display:grid;place-items:center}
+#hp .rolebox{display:flex;align-items:center;gap:8px;height:32px;padding:0 10px;border-radius:var(--r-s);background:var(--surface);border:1px solid var(--surface-3)}
+#hp .rolebox select{background:none;border:none;outline:none;color:var(--tx-hi);font:inherit;font-size:12.5px;cursor:pointer}
+#hp .rolebox select option{background:var(--surface-2);color:var(--tx)}
+#hp .avatar{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#49023a,#992a6c);color:#f6c6d5;display:grid;place-items:center;font-size:11px;font-weight:600;flex:none}
+
+/* ===== 页面通用 ===== */
+#hp .ph{display:flex;align-items:flex-start;gap:var(--s4);margin-bottom:var(--s4)}
+#hp .ph h1{font-size:17px;font-weight:600;color:var(--tx-hi);letter-spacing:.1px}
+#hp .ph p{font-size:12.5px;color:var(--tx-2);margin-top:2px}
+#hp .ph .sp{flex:1}
+#hp .card{background:var(--surface);border:1px solid var(--surface-3);border-radius:var(--r-m)}
+#hp .card-h{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--surface-3);font-size:13px;font-weight:600;color:var(--tx-hi)}
+#hp .card-h .ic{color:var(--tx-2)}
+#hp .muted{color:var(--tx-2)} .tiny{font-size:11.5px} .mono{font-family:var(--mono);font-size:12px}
+#hp .num{font-variant-numeric:tabular-nums}
+#hp .grid2{display:grid;grid-template-columns:1fr 1fr;gap:var(--s4)}
+#hp .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--s3);margin-bottom:var(--s4)}
+#hp .stat{background:var(--surface);border:1px solid var(--surface-3);border-radius:var(--r-m);padding:12px 14px}
+#hp .stat .l{font-size:11.5px;color:var(--tx-2);display:flex;align-items:center;gap:6px}
+#hp .stat .v{font-size:22px;font-weight:600;color:var(--tx-hi);margin-top:3px;font-variant-numeric:tabular-nums;letter-spacing:-.3px}
+#hp .stat .s{font-size:11.5px;color:var(--tx-dim);margin-top:2px}
+#hp .stat .s b{font-weight:500}
+#hp .up{color:var(--green-t)} #hp .down{color:var(--red-t)} #hp .warm{color:var(--brand-w)}
+
+/* ===== 徽章 / 状态 ===== */
+#hp .chip{display:inline-flex;align-items:center;gap:5px;height:20px;padding:0 8px;border-radius:5px;font-size:11px;font-weight:500;white-space:nowrap;border:1px solid transparent}
+#hp .chip .dot{width:6px;height:6px;border-radius:50%;background:currentColor}
+#hp .sev-p1{color:var(--red-t);background:rgba(255,31,71,.10);border-color:rgba(255,31,71,.35)}
+#hp .sev-p2{color:var(--brand-t);background:rgba(197,53,32,.13);border-color:rgba(197,53,32,.40)}
+#hp .sev-p3{color:var(--gold);background:rgba(242,204,96,.08);border-color:rgba(242,204,96,.30)}
+#hp .sev-p4{color:var(--teal-t);background:rgba(0,209,255,.07);border-color:rgba(0,209,255,.28)}
+#hp .st-notified{color:var(--teal-t);background:rgba(0,209,255,.07);border-color:rgba(0,209,255,.28)}
+#hp .st-corr{color:var(--purple-t);background:rgba(178,54,255,.10);border-color:rgba(178,54,255,.35)}
+#hp .st-cand{color:var(--purple-t);background:rgba(178,54,255,.10);border-color:rgba(178,54,255,.45);border-style:dashed}
+#hp .st-supp{color:var(--tx-2);background:rgba(128,128,131,.10);border-color:rgba(128,128,131,.30)}
+#hp .st-ack{color:var(--teal-t);background:rgba(0,209,255,.07);border-color:rgba(0,209,255,.28)}
+#hp .st-closed{color:var(--tx-2);background:rgba(128,128,131,.10);border-color:rgba(128,128,131,.30)}
+#hp .st-open{color:var(--red-t);background:rgba(255,31,71,.10);border-color:rgba(255,31,71,.35)}
+#hp .st-mit{color:var(--gold);background:rgba(242,204,96,.08);border-color:rgba(242,204,96,.30)}
+#hp .st-res{color:var(--green-t);background:rgba(9,228,136,.08);border-color:rgba(9,228,136,.32)}
+#hp .ai-chip{color:var(--purple-t);background:rgba(178,54,255,.10);border-color:rgba(178,54,255,.35)}
+#hp .ok-chip{color:var(--green-t);background:rgba(9,228,136,.08);border-color:rgba(9,228,136,.32)}
+#hp .tag{display:inline-flex;align-items:center;height:17px;padding:0 6px;border-radius:4px;font-size:10px;letter-spacing:.05em;background:var(--surface-3);color:var(--tx-3)}
+#hp .tag.pu{background:rgba(178,54,255,.15);color:var(--purple-t)}
+#hp .tag.br{background:rgba(197,53,32,.15);color:var(--brand-w)}
+#hp .tag.gd{background:rgba(242,204,96,.12);color:var(--gold)}
+
+/* ===== 按钮 ===== */
+#hp .btn{display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 13px;border-radius:var(--r-s);border:1px solid var(--raise);background:var(--surface-2);color:var(--tx);font-size:12.5px;font-weight:500;transition:background .15s,border-color .15s,color .15s;white-space:nowrap}
+#hp .btn:hover{background:var(--surface-3);border-color:var(--raise)}
+#hp .btn:disabled{opacity:.45;cursor:not-allowed}
+#hp .btn-p{background:var(--brand);border-color:transparent;color:#fff}
+#hp .btn-p:hover{background:var(--brand-h)}
+#hp .btn-ai{background:rgba(178,54,255,.10);border-color:rgba(178,54,255,.45);color:var(--purple-t)}
+#hp .btn-ai:hover{background:rgba(178,54,255,.2);border-color:var(--purple)}
+#hp .btn-d{background:rgba(255,31,71,.08);border-color:rgba(255,31,71,.4);color:var(--red-t)}
+#hp .btn-d:hover{background:rgba(255,31,71,.16)}
+#hp .btn-sm{height:26px;padding:0 10px;font-size:11.5px;gap:5px}
+#hp .ibtn{width:26px;height:26px;border-radius:6px;display:grid;place-items:center;color:var(--tx-2);border:1px solid transparent;transition:background .15s,color .15s}
+#hp .ibtn:hover{background:var(--surface-3);color:var(--tx-hi)}
+#hp .ibtn .ic{width:14px;height:14px}
+
+/* ===== 管道可视化 ===== */
+#hp .pipe{display:grid;grid-template-columns:1fr 1fr 1fr 1.2fr;gap:var(--s3);margin-bottom:var(--s4)}
+#hp .pstep{background:var(--surface);border:1px solid var(--surface-3);border-radius:var(--r-m);padding:11px 14px;position:relative;transition:border-color .3s,box-shadow .3s}
+#hp .pstep .n{font-size:11px;color:var(--tx-2);display:flex;align-items:center;gap:6px}
+#hp .pstep .v{font-size:17px;font-weight:600;color:var(--tx-hi);margin-top:2px;font-variant-numeric:tabular-nums}
+#hp .pstep .d{font-size:11px;color:var(--tx-dim);margin-top:1px}
+#hp .pstep.act{border-color:var(--brand);box-shadow:0 0 0 1px var(--brand),0 0 18px rgba(230,82,44,.18)}
+#hp .pstep .arr{position:absolute;right:-15px;top:50%;transform:translateY(-50%);color:var(--tx-dim);z-index:1}
+
+/* ===== 过滤器 / 表格 ===== */
+#hp .fbar{display:flex;align-items:center;gap:var(--s2);margin-bottom:var(--s3);flex-wrap:wrap}
+#hp .seg{display:flex;gap:2px;background:var(--surface);border:1px solid var(--surface-3);border-radius:var(--r-s);padding:2px}
+#hp .seg button{height:24px;padding:0 10px;border-radius:6px;font-size:12px;color:var(--tx-2)}
+#hp .seg button:hover{color:var(--tx)}
+#hp .seg button.on{background:var(--surface-3);color:var(--tx-hi);font-weight:500}
+#hp select.inp,#hp input.inp{height:30px;padding:0 10px;border-radius:var(--r-s);background:var(--surface);border:1px solid var(--surface-3);color:var(--tx-hi);font:inherit;font-size:12.5px;outline:none}
+#hp select.inp option{background:var(--surface-2)}
+#hp input.inp::placeholder{color:var(--tx-dim)}
+#hp input.inp:focus,#hp select.inp:focus{border-color:var(--brand)}
+#hp .tblwrap{overflow-x:auto}
+#hp table{width:100%;border-collapse:collapse;font-size:13px}
+#hp th{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--tx-dim);font-weight:500;text-align:left;padding:9px 14px;border-bottom:1px solid var(--surface-3);white-space:nowrap}
+#hp td{padding:10px 14px;border-bottom:1px solid rgba(34,35,37,.6);vertical-align:middle}
+#hp tr:last-child td{border-bottom:none}
+#hp tbody tr.click{cursor:pointer;transition:background .12s}
+#hp tbody tr.click:hover{background:rgba(25,26,30,.7)}
+#hp .atitle{color:var(--tx-hi);font-weight:500;font-size:13px}
+#hp .asub{font-size:11px;color:var(--tx-2);margin-top:1px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+#hp .rowacts{display:flex;gap:2px;justify-content:flex-end}
+#hp .empty{padding:36px;text-align:center;color:var(--tx-dim);font-size:13px}
+
+/* ===== 候选事件卡片 ===== */
+#hp .cand{margin-bottom:var(--s4)}
+#hp .cand .mem{display:flex;align-items:center;gap:10px;padding:8px 16px;border-top:1px solid rgba(34,35,37,.6);font-size:12.5px}
+#hp .cand .mem .mono{color:var(--tx-3)}
+#hp .rulebox{margin:10px 16px 12px;padding:10px 12px;border-radius:var(--r-s);background:rgba(178,54,255,.06);border:1px solid rgba(178,54,255,.22);font-size:12px;color:var(--tx-3)}
+#hp .rulebox b{color:var(--purple-t);font-weight:600}
+#hp .simbar{height:4px;border-radius:2px;background:rgba(178,54,255,.18);overflow:hidden;margin-top:5px}
+#hp .simbar i{display:block;height:100%;background:var(--purple)}
+
+/* ===== 抽屉 / 弹层 ===== */
+#hp .scrim{position:absolute;inset:0;background:rgba(3,4,5,.62);backdrop-filter:blur(2px);z-index:40;animation:fade .18s}
+#hp .drawer{position:absolute;top:0;right:0;bottom:0;width:500px;max-width:92%;background:var(--surface);border-left:1px solid var(--surface-3);z-index:41;display:flex;flex-direction:column;animation:slidein .2s ease-out}
+#hp .drawer-h{display:flex;align-items:flex-start;gap:10px;padding:16px 18px 12px;border-bottom:1px solid var(--surface-3)}
+#hp .drawer-b{flex:1;overflow-y:auto;padding:14px 18px}
+#hp .drawer-f{padding:12px 18px;border-top:1px solid var(--surface-3);display:flex;gap:8px;flex-wrap:wrap}
+#hp .modal{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(600px,94%);max-height:88%;overflow-y:auto;background:var(--surface);border:1px solid var(--raise);border-radius:var(--r-l);z-index:41;box-shadow:0 24px 70px rgba(0,0,0,.6);animation:pop .18s ease-out}
+#hp .modal-h{display:flex;align-items:center;gap:10px;padding:16px 20px 12px}
+#hp .modal-h h3{font-size:15px;color:var(--tx-hi);font-weight:600}
+#hp .modal-b{padding:4px 20px 18px;font-size:13px}
+#hp .modal-f{padding:12px 20px 16px;display:flex;gap:8px;justify-content:flex-end;border-top:1px solid var(--surface-3)}
+#hp .kv{display:grid;grid-template-columns:110px 1fr;gap:6px 12px;font-size:12.5px}
+#hp .kv dt{color:var(--tx-2)} #hp .kv dd{color:var(--tx-hi)}
+#hp pre.code{background:#0c0d0f;border:1px solid var(--surface-3);border-radius:var(--r-s);padding:12px;font-family:var(--mono);font-size:11.5px;line-height:1.6;color:var(--tx-3);overflow-x:auto;white-space:pre}
+#hp pre.code .add{display:inline-block;width:100%;color:var(--green-t);background:rgba(9,228,136,.09)}
+#hp pre.code .del{display:inline-block;width:100%;color:var(--red-t);background:rgba(255,31,71,.08)}
+#hp .tabs{display:flex;gap:2px;padding:0 18px;border-bottom:1px solid var(--surface-3)}
+#hp .tabs button{height:34px;padding:0 11px;font-size:12.5px;color:var(--tx-2);border-bottom:2px solid transparent;margin-bottom:-1px}
+#hp .tabs button:hover{color:var(--tx)}
+#hp .tabs button.on{color:var(--tx-hi);border-bottom-color:var(--brand)}
+#hp .aibox{border:1px solid rgba(178,54,255,.35);background:rgba(178,54,255,.06);border-radius:var(--r-m);padding:13px 14px;font-size:12.5px}
+#hp .aibox .ah{display:flex;align-items:center;gap:8px;color:var(--purple-t);font-weight:600;font-size:12.5px;margin-bottom:8px}
+#hp .aibox ul{margin:8px 0 0 16px;display:grid;gap:5px;color:var(--tx)}
+#hp .aibox .foot{margin-top:10px;padding-top:9px;border-top:1px dashed rgba(178,54,255,.3);font-size:11px;color:var(--tx-2);display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+#hp .radios{display:grid;gap:8px;margin:10px 0}
+#hp .radios label{display:flex;gap:9px;align-items:flex-start;padding:9px 11px;border:1px solid var(--surface-3);border-radius:var(--r-s);cursor:pointer;font-size:12.5px;transition:border-color .15s}
+#hp .radios label:hover{border-color:var(--raise)}
+#hp .radios input{accent-color:var(--brand);margin-top:2px}
+
+/* ===== 时间线 / 步进器 ===== */
+#hp .tl{position:relative;padding-left:20px;display:grid;gap:0}
+#hp .tl::before{content:'';position:absolute;left:5px;top:6px;bottom:6px;width:1px;background:var(--surface-3)}
+#hp .tli{position:relative;padding:7px 0}
+#hp .tli::before{content:'';position:absolute;left:-19px;top:14px;width:9px;height:9px;border-radius:50%;background:var(--tx-dim);border:2px solid var(--bg)}
+#hp .tli.auto::before{background:var(--teal)}
+#hp .tli.ai::before{background:var(--purple);box-shadow:0 0 8px rgba(178,54,255,.6)}
+#hp .tli.esc::before{background:var(--brand)}
+#hp .tli.man::before{background:var(--green)}
+#hp .tli .tt{font-size:11px;color:var(--tx-dim);display:flex;gap:8px;align-items:center}
+#hp .tli .tx{font-size:12.5px;color:var(--tx);margin-top:1px}
+#hp .steps{display:flex;gap:6px;margin:14px 0 4px}
+#hp .stp{flex:1;min-width:0}
+#hp .stp .bar{height:3px;border-radius:2px;background:var(--surface-3)}
+#hp .stp.done .bar{background:var(--green)}
+#hp .stp.cur .bar{background:var(--brand)}
+#hp .stp .lb{font-size:10.5px;color:var(--tx-dim);margin-top:5px;text-align:center;white-space:nowrap}
+#hp .stp.done .lb{color:var(--green-t)} #hp .stp.cur .lb{color:var(--brand-w)}
+
+/* ===== 排班 / 其他 ===== */
+#hp .week{display:grid;grid-template-columns:repeat(7,1fr);gap:var(--s2)}
+#hp .day{background:var(--surface);border:1px solid var(--surface-3);border-radius:var(--r-s);padding:10px;min-height:86px}
+#hp .day.today{border-color:var(--brand);box-shadow:0 0 0 1px var(--brand)}
+#hp .day .dn{font-size:11px;color:var(--tx-2)}
+#hp .day .who{font-size:12.5px;color:var(--tx-hi);margin-top:6px;font-weight:500}
+#hp .day .who small{display:block;font-size:10.5px;color:var(--tx-2);font-weight:400}
+#hp .switch{position:relative;width:34px;height:19px;flex:none}
+#hp .switch input{position:absolute;opacity:0;width:100%;height:100%;cursor:pointer;z-index:1}
+#hp .switch i{position:absolute;inset:0;border-radius:10px;background:var(--surface-3);transition:background .15s}
+#hp .switch i::after{content:'';position:absolute;left:2.5px;top:2.5px;width:14px;height:14px;border-radius:50%;background:var(--tx-2);transition:transform .15s,background .15s}
+#hp .switch input:checked+i{background:rgba(9,228,136,.35)}
+#hp .switch input:checked+i::after{transform:translateX(15px);background:var(--green)}
+#hp .bars{display:flex;align-items:flex-end;gap:6px;height:110px;padding:4px 2px 0}
+#hp .bars .b{flex:1;display:flex;flex-direction:column;justify-content:flex-end;gap:2px;height:100%}
+#hp .bars .b i{border-radius:3px 3px 0 0;min-height:2px}
+#hp .bars .b span{font-size:10px;color:var(--tx-dim);text-align:center;margin-top:5px}
+#hp .linklist{display:grid;gap:6px;font-size:12.5px}
+#hp .linklist .li{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--surface-3);border-radius:var(--r-s);cursor:pointer;transition:border-color .15s,background .15s}
+#hp .linklist .li:hover{border-color:var(--raise);background:var(--surface-2)}
+
+/* ===== Toast ===== */
+#hp .toasts{position:absolute;right:16px;bottom:16px;z-index:60;display:grid;gap:8px;max-width:380px}
+#hp .toast{background:#17181b;border:1px solid #2a2b2f;border-left:3px solid var(--teal);border-radius:10px;padding:10px 13px;font-size:12.5px;box-shadow:0 10px 30px rgba(0,0,0,.5);animation:tin .22s ease-out}
+#hp .toast.ok{border-left-color:var(--green)} #hp .toast.err{border-left-color:var(--red)}
+#hp .toast.ai{border-left-color:var(--purple)} #hp .toast.warn{border-left-color:var(--gold)}
+#hp .toast b{color:var(--tx-hi);display:block;font-size:12.5px;margin-bottom:1px}
+#hp .toast .ta{color:var(--teal-t);font-size:12px;margin-top:5px;display:inline-flex;align-items:center;gap:4px;cursor:pointer}
+#hp .toast .ta:hover{text-decoration:underline}
+@keyframes tin{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes slidein{from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:none}}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+@keyframes pop{from{opacity:0;transform:translate(-50%,-48%)}to{opacity:1;transform:translate(-50%,-50%)}}
+
+/* ===== 响应式（skill 清单：375/768/1024/1440 不重叠） ===== */
+@media (max-width:1024px){
+  #hp .stats{grid-template-columns:repeat(2,1fr)}
+  #hp .pipe{grid-template-columns:repeat(2,1fr)}
+  #hp .pipe .pstep .arr{display:none}
+  #hp .grid2{grid-template-columns:1fr}
+  #hp .week{grid-template-columns:repeat(4,1fr)}
+}
+@media (max-width:820px){
+  #hp .side{width:56px}
+  #hp .side .lbl,#hp .side .navgrp,#hp .side .logo small,#hp .side .logo b,#hp .side-foot{display:none}
+  #hp .side .logo{justify-content:center;padding:12px 0}
+  #hp .nav{justify-content:center;padding:9px 0;width:calc(100% - 12px);margin:1px 6px}
+  #hp .nav .bdg{position:absolute;transform:translate(10px,-8px)}
+  #hp .nav{position:relative}
+  #hp .gsearch{width:150px}
+  #hp .week{grid-template-columns:repeat(2,1fr)}
+}
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-eye2" viewBox="0 0 24 24"><path d="M12 12h.01"/><path d="M9 3.5c4.6-.9 9.2 1.6 10.7 6a10.6 10.6 0 0 1-2.3 3.7M6.6 5.4A10 10 0 0 0 1.3 9.5c1.5 4.4 6.1 6.9 10.7 6a10 10 0 0 0 1.6-.4"/><circle cx="12" cy="10" r="2.6"/></symbol>
+    <symbol id="i-siren" viewBox="0 0 24 24"><path d="M6 8.5a6 6 0 0 1 12 0c0 6.3 2.5 7.5 2.5 7.5h-17S6 14.8 6 8.5"/><path d="M10 20a2.2 2.2 0 0 0 4 0"/></symbol>
+    <symbol id="i-layers" viewBox="0 0 24 24"><path d="M12 2 2 7.5l10 5 10-5L12 2z"/><path d="m2 12.5 10 5 10-5"/><path d="m2 17.5 10 5 10-5"/></symbol>
+    <symbol id="i-zap" viewBox="0 0 24 24"><path d="M13 2 3 14h7l-1 8 12-14h-8l0-6z"/></symbol>
+    <symbol id="i-cal" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 9.5h18"/></symbol>
+    <symbol id="i-radar" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><path d="M12 12l6.4-6.4"/></symbol>
+    <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3l1.9 5.2L19 10l-5.1 1.8L12 17l-1.9-5.2L5 10l5.1-1.8L12 3z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8L19 15z"/></symbol>
+    <symbol id="i-branch" viewBox="0 0 24 24"><circle cx="6" cy="5" r="2.4"/><circle cx="6" cy="19" r="2.4"/><circle cx="18" cy="7" r="2.4"/><path d="M6 7.4v9.2"/><path d="M18 9.4a9 9 0 0 1-9 7.3"/></symbol>
+    <symbol id="i-gear" viewBox="0 0 24 24"><path d="M4 21v-6M4 9V3M12 21v-9M12 6V3M20 21v-4M20 11V3"/><path d="M1.5 15h5M9.5 6h5M17.5 17h5"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 8.5a6 6 0 0 1 12 0c0 6.3 2.5 7.5 2.5 7.5h-17S6 14.8 6 8.5"/><path d="M10 20a2.2 2.2 0 0 0 4 0"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+    <symbol id="i-warn" viewBox="0 0 24 24"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4.5M12 17.5h.01"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 22s8-3.6 8-10V5l-8-3-8 3v7c0 6.4 8 10 8 10z"/><path d="m9 11.5 2 2 4-4.5"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.2 1.9"/></symbol>
+    <symbol id="i-chl" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+    <symbol id="i-chr" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+    <symbol id="i-arr" viewBox="0 0 24 24"><path d="M4 12h15M13 6l6 6-6 6"/></symbol>
+    <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 13h6M9 17h4"/></symbol>
+    <symbol id="i-term" viewBox="0 0 24 24"><path d="m4 17 6-6-6-6M12 19h8"/></symbol>
+    <symbol id="i-inbox" viewBox="0 0 24 24"><path d="M22 12h-5.5l-2 3h-5l-2-3H2"/><path d="M5.5 5h13L22 12v5a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-5z"/></symbol>
+    <symbol id="i-filter" viewBox="0 0 24 24"><path d="M22 3.5H2l8 9.5v6.5l4 2v-8.5z"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></symbol>
+    <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l2.5-2.5a5 5 0 0 0-7-7L11.5 5.5"/><path d="M14 11a5 5 0 0 0-7.5-.5L4 13a5 5 0 0 0 7 7l1.5-1.5"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.6-6.3L21 8"/><path d="M21 3v5h-5"/></symbol>
+  </defs>
+</svg>
+
+<div id="hp">
+  <aside class="side">
+    <div class="logo">
+      <div class="logo-mark"><svg class="ic"><use href="#i-eye2"/></svg></div>
+      <div><b>HuntAI SRE</b><small>K8s 运维平台 · 原型 v0.1</small></div>
+    </div>
+    <div id="hp-nav"></div>
+    <div class="side-foot"><span class="dot-ok"></span>告警接入层正常 · 演示数据</div>
+  </aside>
+  <div class="main">
+    <header class="topbar">
+      <span class="env"><svg class="ic" style="width:12px;height:12px"><use href="#i-shield"/></svg>P0-P2 演示环境</span>
+      <div class="gsearch"><svg class="ic" style="width:14px;height:14px"><use href="#i-search"/></svg><input id="hp-q" placeholder="搜索告警 / fingerprint…" aria-label="全局搜索告警"></div>
+      <div style="flex:1"></div>
+      <div class="rolebox" title="切换角色后按权限矩阵（领域模型 §3）生效">
+        <svg class="ic" style="width:14px;height:14px;color:var(--tx-2)"><use href="#i-user"/></svg>
+        <select id="hp-role" aria-label="切换角色">
+          <option value="sre">SRE 工程师 · 李四</option>
+          <option value="admin">平台管理员 · Admin</option>
+          <option value="oncall_manager">值班经理 · 王五</option>
+          <option value="developer">研发工程师 · 赵六</option>
+          <option value="viewer">访客 · 只读</option>
+        </select>
+      </div>
+      <button class="iconbtn" id="hp-bell" aria-label="通知（3 条未读）"><svg class="ic"><use href="#i-bell"/></svg><span class="pip" id="hp-bellpip">3</span></button>
+      <div class="avatar" id="hp-avatar" title="当前登录用户">李</div>
+    </header>
+    <main class="content" id="hp-view"></main>
+  </div>
+  <div id="hp-layer"></div>
+  <div class="toasts" id="hp-toasts" aria-live="polite"></div>
+</div>
+
+<script>
+(function(){
+'use strict';
+const $=s=>document.getElementById(s), root=$('hp');
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const ic=(n,st='')=>`<svg class="ic" ${st?`style="${st}"`:''} aria-hidden="true"><use href="#i-${n}"/></svg>`;
+
+/* ============ 演示数据（全部为虚构占位，对应 docs/02-business-design 领域模型） ============ */
+const D={
+alerts:[
+ {id:'AL-2041',sev:'P1',title:'KubePodCrashLooping · checkout-7d9f4-x2',provider:'Alertmanager',fp:'alertname=KubePodCrashLooping,namespace=checkout,pod=checkout-7d9f4-x2',count:18,team:'电商-交易',env:'prod',status:'correlated',inc:'INC-1007',at:'3 分钟前',note:'全同告警合并 ×18（fingerprint 三字段全命中）',ai:{model:'qwen2.5-32b（本地 vLLM）',tokens:'1.4k 输出 tokens · 0.9s',text:'Pod 在 30 分钟内重启 18 次，退出码 137（OOMKilled）。结合最近一次发布变更（2 小时前 checkout-api v2.31.0 上线，堆内存上限 512Mi 未调整），判断为新版本内存泄漏或请求放大导致 OOM。建议：1) 回滚至 v2.30.4 观察重启频率；2) 临时调高 memory limit 至 1Gi 并关注节点水位；3) 若回滚后仍复现，抓取 heap profile 进一步定位。',digest:'namespace/pod/IP 已掩码，映射表仅存本地（BR-01）'}},
+ {id:'AL-2042',sev:'P2',title:'KubeNodeNotReady · gpu-node-03',provider:'Prometheus',fp:'alertname=KubeNodeNotReady,node=gpu-node-03',count:3,team:'平台-基础设施',env:'prod',status:'candidate',at:'8 分钟前',note:'与 MemoryPressure 命中候选关联规则 CR-12',ai:{noai:true,text:'AI 网关超时，已自动熔断为 NoAI 模式：以下透出原始错误供人工排查。',raw:'node gpu-node-03: KubeletNotReady · container runtime network not ready: cni plugin not initialized (raw from kubelet event)'}},
+ {id:'AL-2043',sev:'P2',title:'MemoryPressure · gpu-node-03',provider:'Prometheus',fp:'alertname=MemoryPressure,node=gpu-node-03',count:5,team:'平台-基础设施',env:'prod',status:'candidate',at:'11 分钟前',note:'与 NodeNotReady 命中候选关联规则 CR-12',ai:null},
+ {id:'AL-2044',sev:'P3',title:'HighCPUThrottling · payment-svc-0',provider:'Alertmanager',fp:'alertname=HighCPUThrottling,namespace=payment,pod=payment-svc-0',count:24,team:'电商-交易',env:'prod',status:'suppressed',at:'1 小时前',note:'处于维护窗口内自动抑制，窗口结束未恢复将重新入管道（BR-07）',ai:null},
+ {id:'AL-2045',sev:'P2',title:'KubeHpaMaxedOut · checkout-api',provider:'Prometheus',fp:'alertname=KubeHpaMaxedOut,namespace=checkout,deploy=checkout-api',count:1,team:'电商-交易',env:'prod',status:'correlated',inc:'INC-1007',at:'6 分钟前',note:'命中关联规则 CR-07，归并进 INC-1007',ai:null},
+ {id:'AL-2046',sev:'P4',title:'ReplicaAvailabilityBelowTarget · web-frontend (staging)',provider:'Alertmanager',fp:'alertname=ReplicaAvailability,namespace=web,env=staging',count:2,team:'电商-前端',env:'staging',status:'notified',at:'26 分钟前',note:'独立告警，未命中关联规则',ai:null},
+ {id:'AL-2047',sev:'P1',title:'APIServerLatencyHigh · prod-cluster-a',provider:'Prometheus',fp:'alertname=APIServerLatencyHigh,cluster=prod-a',count:1,team:'平台-基础设施',env:'prod',status:'notified',at:'12 分钟前',note:'独立告警',ai:null},
+ {id:'AL-2048',sev:'P3',title:'TLSCertExpiringSoon · ingress-gateway',provider:'Alertmanager',fp:'alertname=TLSCertExpiring,svc=ingress-gateway',count:9,team:'平台-基础设施',env:'prod',status:'notified',at:'2 小时前',note:'部分相同合并 ×9（fingerprint_fields=[alertname,svc]）',ai:null},
+],
+candidates:[
+ {id:'CAND-31',title:'checkout 命名空间 CrashLoop 与 HPA 打满集中爆发',rule:'CR-07',ruleDesc:'AND[ namespace=checkout · severity≥P2 · 10min 时间窗 ]（auto 模式需运行 ≥30 天且零误报，当前为候选模式 BR-04）',sim:.92,members:[
+   {sev:'P1',t:'KubePodCrashLooping · checkout-7d9f4-x2',fp:'…namespace=checkout,pod=checkout-7d9f4-x2',c:18},
+   {sev:'P2',t:'KubeHpaMaxedOut · checkout-api',fp:'…namespace=checkout,deploy=checkout-api',c:1},
+   {sev:'P1',t:'KubePodCrashLooping · checkout-7d9f4-k8',fp:'…namespace=checkout,pod=checkout-7d9f4-k8',c:6}],win:'14:01 – 14:11（10 分钟）'},
+ {id:'CAND-32',title:'gpu-node-03 内存压力与节点 NotReady 连锁',rule:'CR-12',ruleDesc:'AND[ node=gpu-node-03 · severity≥P2 · 15min 时间窗 ]（候选模式 BR-04）',sim:.87,members:[
+   {sev:'P2',t:'MemoryPressure · gpu-node-03',fp:'…node=gpu-node-03',c:5},
+   {sev:'P2',t:'KubeNodeNotReady · gpu-node-03',fp:'…node=gpu-node-03',c:3}],win:'13:56 – 14:11（15 分钟）'},
+],
+incidents:[
+ {id:'INC-1007',sev:'P1',title:'checkout 服务大面积 CrashLoop，HPA 已打满',status:'open',assignee:null,team:'电商-交易',sp:'synced',at:'今天 14:02',
+  alerts:['AL-2041','AL-2045'],
+  timeline:[
+   {t:'14:02',k:'auto',x:'关联规则 CR-07 归并 2 条告警，事件立项（BR-04 候选确认后自动同步）'},
+   {t:'14:02',k:'auto',x:'状态页已自动同步：内部状态页显示「部分功能降级」（BR-06）'},
+   {t:'14:03',k:'esc',x:'升级链 L1：钉钉已投递 电商SRE-Primary（NotificationRecord NR-8812 · sent）'},
+   {t:'14:08',k:'esc',x:'L1 超时 5 分钟未确认，自动升级 L2（BR-08）：强提醒 + 短信投递 张三'},
+   {t:'14:09',k:'esc',x:'L2 已确认：张三 Ack，升级链停止'}]},
+ {id:'INC-1008',sev:'P2',title:'gpu-node-03 内存压力导致节点 NotReady',status:'acknowledged',assignee:'李四',team:'平台-基础设施',sp:'synced',at:'今天 13:40',
+  alerts:['AL-2042','AL-2043'],
+  timeline:[{t:'13:40',k:'auto',x:'人工立项：gpu-node-03 连锁告警'},{t:'13:52',k:'man',x:'李四 确认处理（Ack），升级链停止'},{t:'13:55',k:'man',x:'初步止血：cordon gpu-node-03，驱逐待调度 Pod 至备用池'}]},
+ {id:'INC-1001',sev:'P3',title:'staging web-frontend 副本数低于目标',status:'resolved',assignee:'赵六',team:'电商-前端',sp:'none',at:'昨天 18:20',
+  alerts:[],timeline:[{t:'18:20',k:'auto',x:'独立告警人工立项'},{t:'18:41',k:'man',x:'赵六 根因恢复：HPA minReplicas 配置回填'},{t:'18:42',k:'auto',x:'P3 事件无需复盘，直接关闭入口已开放'}]},
+ {id:'INC-0996',sev:'P4',title:'告警链路演练（计划内）',status:'closed',assignee:'李四',team:'平台-基础设施',sp:'none',at:'周一 10:00',
+  alerts:[],timeline:[{t:'10:00',k:'auto',x:'演练事件立项'},{t:'10:30',k:'man',x:'演练完成，事件关闭'}]},
+],
+findings:[
+ {id:'F-201',code:'K8S-POD-OOMKILL',res:'checkout / deploy checkout-api',sev:'P2',cluster:'prod-cluster-a',st:'open',ai:null},
+ {id:'F-202',code:'K8S-NODE-DISK-PRESSURE',res:'node / worker-05',sev:'P2',cluster:'prod-cluster-a',st:'acknowledged',ai:{model:'qwen2.5-32b（本地 vLLM）',tokens:'1.1k 输出 tokens · 0.7s',text:'worker-05 磁盘使用率 89%，imagefs 已触达 GC 阈值。根因最可能是未清理的已完成 Job 产物与镜像缓存堆积。建议：1) 清理 7 天前的 Completed Job；2) 将 kubelet garbage collection 阈值下调至 70%；3) 排查是否有大体积日志未挂载到独立 PV。',digest:'输入仅含错误片段与资源元数据，node 名称已掩码还原展示（BR-01）'}},
+ {id:'F-203',code:'K8S-IMG-TAG-LATEST',res:'payment / deploy payment-worker',sev:'P3',cluster:'prod-cluster-a',st:'open',ai:{model:'qwen2.5-14b（本地 vLLM）',tokens:'0.8k 输出 tokens · 0.5s',text:'生产部署使用了 latest 标签，回滚与审计不可追溯。建议在 CI 中固定 image digest，并启用策略校验（如 Kyverno 禁止 latest）。',digest:'镜像仓库地址已掩码（BR-01）'}},
+ {id:'F-204',code:'K8S-PDB-MIN-AVAILABLE',res:'checkout / pdb checkout-api',sev:'P3',cluster:'prod-cluster-a',st:'open',ai:null},
+ {id:'F-205',code:'K8S-REPLICA-MISMATCH',res:'web / deploy web-frontend',sev:'P4',cluster:'staging-cluster',st:'open',ai:null,info:true},
+ {id:'F-206',code:'K8S-NETPOL-DENY',res:'staging-ml / ns staging-ml',sev:'P4',cluster:'staging-cluster',st:'ignored',ai:null,info:true},
+],
+aiTasks:[
+ {id:'TASK-1042',type:'investigate',obj:'INC-1007 · checkout CrashLoop',model:'gpt-oss-120b（本地 vLLM）',status:'pending_approval',calls:9,callsMax:40,tokens:'21k / 100k',by:'李四',note:'Agent 循环请求调用高危工具：kubectl delete pod（写操作）→ 挂起待审批（BR-02）',tool:'kubectl delete pod checkout-7d9f4-x2 -n checkout',reason:'Pod 已 OOMKilled 18 次，Agent 判定重启无法恢复，请求删除以触发重建拉起。该工具为写类高危工具，需人工批准后执行。'},
+ {id:'TASK-1041',type:'explain',obj:'F-202 · NODE-DISK-PRESSURE',model:'qwen2.5-32b（本地 vLLM）',status:'completed',calls:1,callsMax:40,tokens:'1.1k / 100k',by:'巡检策略 IL-03',note:'范式 A 解释链路，含脱敏（BR-01）与全量调用审计（BR-10）'},
+ {id:'TASK-1040',type:'workflow_gen',obj:'NL 生成：OOM 告警自动标注与通知',model:'gpt-oss-120b（本地 vLLM）',status:'completed',calls:4,callsMax:40,tokens:'6.3k / 100k',by:'李四',note:'产出 Workflow YAML 草稿，人工确认前不得执行（BR-05）'},
+ {id:'TASK-1039',type:'investigate',obj:'INC-1004 · 支付回调超时',model:'gpt-oss-120b（本地 vLLM）',status:'budget_exceeded',calls:40,callsMax:40,tokens:'100k / 100k',by:'李四',note:'达到预算上限，优雅终止：部分结论已输出并显式标注「未完成」（BR-03）'},
+],
+workflows:[
+ {id:'WF-014',name:'checkout-oom-annotate',ver:'v2',src:'manual',trig:'alert',runs:126,last:'今天 13:02 · succeeded'},
+ {id:'WF-009',name:'gpu-node-drain',ver:'v3',src:'ai_generated',by:'李四',trig:'manual',runs:8,last:'昨天 09:14 · succeeded'},
+ {id:'WF-021',name:'tls-cert-renew-notify',ver:'v1',src:'manual',trig:'schedule',runs:56,last:'周一 04:00 · succeeded'},
+],
+oncall:{days:['周一','周二','周三','周四','周五','周六','周日'],primary:['李四','李四','李四','王五','王五','张三','张三'],secondary:['王五','王五','王五','李四','李四','—','—'],override:'周六：张三临时顶班（overrides 记录 OR-22）',
+ esc:[{lv:'L1 · 一级',target:'电商SRE-Primary（IM）',to:'5 分钟 [TBD-BIZ]'},{lv:'L2 · 二级',target:'值班主管（IM 强提醒 + 短信）',to:'15 分钟 [TBD-BIZ]'},{lv:'L3 · 三级',target:'管理群 + 电话外呼 [TBD-BIZ]',to:'30 分钟'}]},
+};
+
+/* ============ 状态 ============ */
+const S={page:'alerts',role:'sre',q:'',sev:'all',st:'all',cluster:'prod-cluster-a',
+ drawer:null,drawerTab:'detail',modal:null,incView:null,fAi:null,pipeline:null,bell:3,
+ incSeq:1009,tasksOpen:false};
+
+const ROLE_PERMS={
+ sre:['alert:manage','incident:manage','candidate:view','candidate:decide','finding:claim','ai:view','ai:approve','wf:view','wf:manage','oncall:view'],
+ admin:['*'],
+ oncall_manager:['oncall:edit','oncall:view','incident:view'],
+ developer:['finding:claim','incident:view'],
+ viewer:[]};
+const ROLE_NAME={sre:'李四（SRE）',admin:'Admin（管理员）',oncall_manager:'王五（值班经理）',developer:'赵六（研发）',viewer:'访客'};
+const can=p=>ROLE_PERMS[S.role].includes('*')||ROLE_PERMS[S.role].includes(p);
+
+const NAV=[
+ {grp:'数据面',items:[
+  {id:'alerts',ic:'siren',label:'告警工作台',badge:()=>D.alerts.filter(a=>a.status==='notified'||a.status==='candidate').length},
+  {id:'candidates',ic:'layers',label:'候选事件',view:'candidate:view',badge:()=>D.candidates.length}]},
+ {grp:'控制面',items:[
+  {id:'incidents',ic:'zap',label:'事件响应',badge:()=>D.incidents.filter(i=>['open','acknowledged'].includes(i.status)).length},
+  {id:'oncall',ic:'cal',label:'排班与升级',view:'oncall:view'}]},
+ {grp:'运营面',items:[
+  {id:'inspections',ic:'radar',label:'巡检看板'},
+  {id:'workflows',ic:'branch',label:'Workflow 编排',tag:'P3',view:'wf:view'}]},
+ {grp:'智能面',items:[
+  {id:'ai',ic:'spark',label:'AI 任务中心',view:'ai:view',badge:()=>D.aiTasks.filter(t=>t.status==='pending_approval').length,badgeCls:'pu'}]},
+ {grp:'系统',items:[
+  {id:'admin',ic:'gear',label:'管理后台',view:'admin:view'}]}];
+
+const SEV={P1:['sev-p1','P1 · 严重'],P2:['sev-p2','P2 · 高'],P3:['sev-p3','P3 · 中'],P4:['sev-p4','P4 · 低']};
+const sevB=s=>`<span class="chip ${SEV[s][0]}">${SEV[s][1]}</span>`;
+const AST={notified:['st-notified','已通知'],correlated:['st-corr','已关联'],suppressed:['st-supp','已抑制'],candidate:['st-cand','候选关联'],acked:['st-ack','已认领'],closed:['st-closed','已关闭']};
+const stB=s=>`<span class="chip ${AST[s][0]}"><span class="dot"></span>${AST[s][1]}</span>`;
+const IST={open:['st-open','立项 open'],acknowledged:['st-ack','已确认'],mitigated:['st-mit','已止血'],resolved:['st-res','已恢复'],closed:['st-closed','已关闭']};
+const istB=s=>`<span class="chip ${IST[s][0]}"><span class="dot"></span>${IST[s][1]}</span>`;
+const TST={created:['st-notified','created'],sanitizing:['st-notified','sanitizing 脱敏中'],running:['st-notified','running'],pending_approval:['st-cand','pending_approval'],completed:['st-res','completed'],cancelled:['st-closed','cancelled'],budget_exceeded:['sev-p3','budget_exceeded'],failed:['st-open','failed']};
+const tstB=s=>`<span class="chip ${TST[s][0]}"><span class="dot"></span>${TST[s][1]}</span>`;
+const TT={explain:'AI 解释 · 范式 A',investigate:'Agent 调查 · 范式 B',workflow_gen:'NL→Workflow · 范式 C'};
+
+/* ============ 渲染：侧栏 / 徽标 ============ */
+function renderNav(){
+ $('hp-nav').innerHTML=NAV.map(g=>{
+  const items=g.items.filter(n=>!n.view||can(n.view)).map(n=>{
+   const b=n.badge?n.badge():0;
+   return `<button class="nav ${S.page===n.id?'on':''}" data-act="nav" data-id="${n.id}" aria-current="${S.page===n.id}">
+     ${ic(n.ic)}<span class="lbl">${n.label}</span>${n.tag?`<span class="tag pu">${n.tag}</span>`:''}${b?`<span class="bdg ${n.badgeCls||''}">${b}</span>`:''}</button>`;}).join('');
+  return items?`<div class="navgrp">${g.grp}</div>${items}`:'';}).join('');
+ const pend=D.aiTasks.filter(t=>t.status==='pending_approval').length;
+ const nb=3+(S.role==='sre'||S.role==='admin'?pend:0);
+ $('hp-bellpip').textContent=nb;
+ $('hp-avatar').textContent=ROLE_NAME[S.role][0];
+}
+function toast(title,msg,kind='',act=null){
+ const t=document.createElement('div');t.className='toast '+kind;
+ t.innerHTML=`<b>${title}</b><span>${msg}</span>${act?`<span class="ta" data-act="${act.act}" data-id="${act.id||''}">${ic('arr','width:12px;height:12px')}${act.label}</span>`:''}`;
+ $('hp-toasts').appendChild(t);
+ setTimeout(()=>{t.style.opacity='0';t.style.transition='opacity .3s';setTimeout(()=>t.remove(),320)},4200);
+}
+
+/* ============ 页面：告警工作台 ============ */
+function pageAlerts(){
+ const list=D.alerts.filter(a=>(S.sev==='all'||a.sev===S.sev)&&(S.st==='all'||a.status===S.st)&&(!S.q||(a.title+a.fp).toLowerCase().includes(S.q)));
+ const dedup=962, ing=1284;
+ const pipe=S.pipeline;
+ const step=(n,label,v,d)=>`<div class="pstep ${pipe&&pipe.step>=n?'act':''}"><div class="n">${label}</div><div class="v">${v}</div><div class="d">${d}</div>${n<4?'<span class="arr">'+ic('chr')+'</span>':''}</div>`;
+ return `
+ <div class="ph"><div><h1>告警工作台</h1><p>接入 → 去重 → 富化 → 关联（L1 链路）· 数据更新于 5 秒前</p></div><div class="sp"></div>
+   <button class="btn" data-act="simulate" ${pipe&&pipe.running?'disabled':''}>${ic('inbox')}模拟告警接入</button></div>
+ <div class="pipe">
+  ${step(1,'① 接入',ing.toLocaleString(),'今日 webhook 接入')}
+  ${step(2,'② 去重',dedup.toLocaleString(),'全同丢弃 + 部分合并 74.9%')}
+  ${step(3,'③ 富化','100%','EnrichmentRule 命中 team / 影响面')}
+  ${step(4,'④ 关联','23 个事件','候选 2 · 归并 21 · 独立 '+(list.filter(a=>a.status==='notified').length))}
+ </div>
+ <div class="stats">
+  <div class="stat"><div class="l">${ic('siren','width:13px;height:13px')}待处理告警</div><div class="v num">${list.filter(a=>a.status==='notified').length}</div><div class="s">较昨日 <b class="down">+3</b></div></div>
+  <div class="stat"><div class="l">${ic('inbox','width:13px;height:13px')}去重抑制</div><div class="v num">962</div><div class="s">降噪率 <b class="up">74.9%</b></div></div>
+  <div class="stat"><div class="l">${ic('warn','width:13px;height:13px')}P1/P2 活跃</div><div class="v num">${D.alerts.filter(a=>(a.sev==='P1'||a.sev==='P2')&&a.status!=='suppressed'&&a.status!=='closed').length}</div><div class="s">关联事件 <b class="warm">${D.incidents.filter(i=>i.status!=='closed'&&i.status!=='resolved').length}</b> 个</div></div>
+  <div class="stat"><div class="l">${ic('shield','width:13px;height:13px')}维护窗口抑制</div><div class="v num">1</div><div class="s">完整留痕（BR-07）</div></div>
+ </div>
+ <div class="card">
+  <div class="fbar" style="padding:10px 14px;border-bottom:1px solid var(--surface-3)">
+   <div class="seg" role="group" aria-label="严重度筛选">
+    ${['all','P1','P2','P3','P4'].map(s=>`<button data-act="sevf" data-id="${s}" class="${S.sev===s?'on':''}">${s==='all'?'全部':s}</button>`).join('')}
+   </div>
+   <select class="inp" id="hp-stf" aria-label="状态筛选">
+    <option value="all">全部状态</option>
+    ${Object.keys(AST).map(k=>`<option value="${k}" ${S.st===k?'selected':''}>${AST[k][1]}</option>`).join('')}
+   </select>
+   <div style="flex:1"></div>
+   <span class="tiny muted num">${list.length} 条</span>
+  </div>
+  <div class="tblwrap"><table aria-label="告警列表">
+   <thead><tr><th>严重度</th><th>告警 / 降噪归因</th><th>fingerprint</th><th>富化</th><th>状态</th><th>最近发生</th><th></th></tr></thead>
+   <tbody>${list.map(a=>`
+    <tr class="click" data-act="alert-open" data-id="${a.id}">
+     <td>${sevB(a.sev)}</td>
+     <td><div class="atitle">${esc(a.title)}</div><div class="asub">${ic('link','width:11px;height:11px')} ${a.provider} · ${esc(a.note)}</div></td>
+     <td><span class="mono muted">${esc(a.fp.length>44?'…'+a.fp.slice(-44):a.fp)}</span>${a.count>1?`<span class="tag br" style="margin-left:6px">×${a.count}</span>`:''}</td>
+     <td class="tiny"><div>${esc(a.team)}</div><div class="muted">${esc(a.env)}</div></td>
+     <td>${stB(a.status)}</td>
+     <td class="tiny muted num">${a.at}</td>
+     <td><div class="rowacts">
+       ${a.status==='notified'&&can('alert:manage')?`<button class="ibtn" data-act="ack" data-id="${a.id}" aria-label="认领（Ack）" data-tooltip="认领（Ack），升级链停止">${ic('check')}</button>
+       <button class="ibtn" data-act="toinc" data-id="${a.id}" aria-label="转事件" data-tooltip="转为事件立项">${ic('arr')}</button>`:''}
+       ${a.status!=='closed'&&a.status!=='suppressed'&&can('alert:manage')?`<button class="ibtn" data-act="suppress" data-id="${a.id}" aria-label="抑制建议" data-tooltip="标记误报 / 抑制建议，进入降噪反馈池">${ic('x')}</button>`:''}
+     </div></td>
+    </tr>`).join('')||'<tr><td colspan="7" class="empty">没有匹配的告警</td></tr>'}
+   </tbody></table></div>
+ </div>`;
+}
+
+/* ============ 告警抽屉 ============ */
+function openDrawer(a){
+ S.drawer=a.id;S.drawerTab='detail';renderLayer();
+}
+function renderDrawer(){
+ const a=D.alerts.find(x=>x.id===S.drawer);if(!a)return '';
+ const tabs=[['detail','详情'],['payload','原始 Payload'],['enrich','富化字段'],['ai','AI 解释'],['inc','关联事件']];
+ let body='';
+ if(S.drawerTab==='detail'){
+  body=`<dl class="kv">
+   <dt>状态</dt><dd>${stB(a.status)}</dd>
+   <dt>最近发生</dt><dd>${a.at} · 30 分钟内 ${a.count} 次</dd>
+   <dt>来源 Provider</dt><dd>${a.provider} <span class="tag">push</span></dd>
+   <dt>fingerprint</dt><dd class="mono">${esc(a.fp)}</dd>
+  </dl>
+  <div class="aibox" style="margin-top:14px;border-color:rgba(0,209,255,.3);background:rgba(0,209,255,.05)">
+   <div class="ah" style="color:var(--teal-t)">${ic('inbox','width:14px;height:14px')}降噪归因</div>
+   ${esc(a.note)}
+   <div class="foot" style="border-color:rgba(0,209,255,.25)">去重字段来自 Provider 配置 fingerprint_fields · 关联决策可在候选队列复核（BR-04）</div>
+  </div>`;
+ }else if(S.drawerTab==='payload'){
+  body=`<pre class="code">${esc(JSON.stringify({alertname:a.fp.split(',')[0].split('=')[1],namespace:(a.fp.match(/namespace=([\w-]+)/)||[])[1]||null,labels:{team:a.team,env:a.env,severity:a.sev},startsAt:'2026-10-24T13:56:02Z',generatorURL:'prometheus/prod-a/graph?g0='+a.id,status:'firing'},null,2))}</pre>
+  <p class="tiny muted" style="margin-top:10px">原始 payload 按 Provider 归一化后入库；凭证类字段永不入库（安全红线）。</p>`;
+ }else if(S.drawerTab==='enrich'){
+  body=`<dl class="kv">
+   <dt>team</dt><dd>${a.team} <span class="tag">ER-03 映射</span></dd>
+   <dt>service</dt><dd>${esc((a.fp.match(/(deploy|svc|pod)=([\w-]+)/)||[])[2]||'—')}</dd>
+   <dt>environment</dt><dd>${a.env}</dd>
+   <dt>oncall_group</dt><dd>${a.team.includes('电商')?'电商SRE-Primary':'平台SRE-Primary'}</dd>
+   <dt>runbook</dt><dd><a href="#" onclick="return false">RB-014 · Pod CrashLoop 处置</a></dd>
+   <dt>影响面</dt><dd>核心交易链路 · SLI 可用性 -0.4%</dd>
+  </dl>
+  <p class="tiny muted" style="margin-top:12px">富化是关联的前置：关联条件依赖 team / severity 字段（L1 设计要点）。</p>`;
+ }else if(S.drawerTab==='ai'){
+  if(!can('ai:view')) body=`<div class="empty">当前角色无 AI 能力权限（权限矩阵 §3）</div>`;
+  else if(!a.ai) body=`<div class="empty">${ic('spark')}未生成 AI 解释<br><span class="tiny">warn 级以上按 policy 的 ai_explain_level 触发（BR-09）</span></div>`;
+  else if(a.ai.noai) body=`<div class="aibox" style="border-color:rgba(242,204,96,.4);background:rgba(242,204,96,.05)">
+   <div class="ah" style="color:var(--gold)">${ic('warn','width:14px;height:14px')}NoAI 降级模式</div>
+   ${esc(a.ai.text)}<pre class="code" style="margin-top:10px">${esc(a.ai.raw)}</pre>
+   <div class="foot" style="border-color:rgba(242,204,96,.3)">模型不可用时自动熔断，透出原始错误与人工入口（§6 降级路径）</div></div>`;
+  else body=`<div class="aibox">
+   <div class="ah">${ic('spark','width:14px;height:14px')}AI 诊断解释 <span class="tag pu">已脱敏 BR-01</span></div>
+   ${esc(a.ai.text)}
+   <div class="foot">${ic('shield','width:12px;height:12px')} ${esc(a.ai.digest)}<span>·</span>${ic('term','width:12px;height:12px')} ${a.ai.model}<span>·</span>${ic('clock','width:12px;height:12px')} ${a.ai.tokens}<span>·</span>AICallLog 已留痕（BR-10）</div></div>`;
+ }else{
+  body=a.inc?`<div class="linklist"><div class="li" data-act="go-inc" data-id="${a.inc}">${ic('zap','width:14px;height:14px;color:var(--brand-t)')}<span><b style="color:var(--tx-hi)">${a.inc}</b> · 关联事件<br><span class="tiny muted">点击进入事件详情</span></span><span style="margin-left:auto">${ic('chr')}</span></div></div>`
+   :`<div class="empty">未关联事件<br><span class="tiny">命中关联规则后将归并进事件（候选模式需人工确认 BR-04）</span></div>`;
+ }
+ return `<div class="drawer-h"><div style="flex:1">${sevB(a.sev)} <span class="atitle" style="font-size:14px">${esc(a.title)}</span>
+   <div class="asub" style="margin-top:5px">${stB(a.status)} <span class="mono muted">${a.id}</span></div></div>
+   <button class="ibtn" data-act="close-layer" aria-label="关闭抽屉">${ic('x')}</button></div>
+  <div class="tabs" role="tablist" aria-label="告警详情">${tabs.map(t=>`<button role="tab" aria-selected="${S.drawerTab===t[0]}" class="${S.drawerTab===t[0]?'on':''}" data-act="tab" data-id="${t[0]}">${t[1]}</button>`).join('')}</div>
+  <div class="drawer-b">${body}</div>
+  <div class="drawer-f">${a.status==='notified'&&can('alert:manage')?`<button class="btn btn-p btn-sm" data-act="ack" data-id="${a.id}">${ic('check')}认领（Ack）</button>
+   <button class="btn btn-sm" data-act="toinc" data-id="${a.id}">${ic('arr')}转事件</button>
+   <button class="btn btn-sm" data-act="suppress" data-id="${a.id}">${ic('x')}抑制建议</button>`:''}
+   ${a.status==='acked'&&can('alert:manage')?`<button class="btn btn-sm" data-act="closealert" data-id="${a.id}">${ic('check')}关闭告警</button>`:''}
+   <span class="tiny muted" style="margin-left:auto;align-self:center">${ic('clock','width:12px;height:12px')} 处置将记录审计日志（BR-10）</span></div>`;
+}
+
+/* ============ 候选事件 ============ */
+function pageCandidates(){
+ if(!can('candidate:view'))return `<div class="empty">当前角色不可见候选事件队列</div>`;
+ return `
+ <div class="ph"><div><h1>候选事件确认队列</h1><p>关联规则（候选模式）产出，人工确认后才正式立项（BR-04）</p></div></div>
+ ${D.candidates.map(c=>`
+ <div class="card cand">
+  <div class="card-h">${ic('layers')}<span style="flex:1">${esc(c.title)}</span><span class="tag pu">候选 · ${c.id}</span></div>
+  <div class="rulebox"><b>命中规则 ${c.rule}</b> · ${esc(c.ruleDesc)}<br>
+   <span class="tiny muted">时间窗 ${c.win} · 相似度 ${(c.sim*100).toFixed(0)}%</span>
+   <div class="simbar" style="width:180px"><i style="width:${c.sim*100}%"></i></div></div>
+  <div class="tiny muted" style="padding:0 16px 4px">成员告警 ${c.members.length} 条：</div>
+  ${c.members.map(m=>`<div class="mem">${sevB(m.sev)}<span style="flex:1">${esc(m.t)}</span><span class="mono muted">×${m.c}</span><span class="mono muted">${esc(m.fp)}</span></div>`).join('')}
+  <div style="display:flex;gap:8px;padding:12px 16px;border-top:1px solid var(--surface-3)">
+   ${can('candidate:decide')?`<button class="btn btn-p btn-sm" data-act="cand-ok" data-id="${c.id}">${ic('check')}确认立项</button>
+   <button class="btn btn-sm" data-act="cand-no" data-id="${c.id}">驳回</button>
+   <span class="tiny muted" style="margin-left:auto;align-self:center">驳回原因将回流至规则调优队列</span>`:'<span class="tiny muted">当前角色只读（权限矩阵 §3）</span>'}
+  </div>
+ </div>`).join('')||'<div class="card"><div class="empty">队列为空 · 所有候选已确认或驳回</div></div>'}`;
+}
+
+/* ============ 事件响应 ============ */
+function pageIncidents(){
+ if(S.incView)return incDetail(D.incidents.find(i=>i.id===S.incView));
+ return `
+ <div class="ph"><div><h1>事件响应</h1><p>立项 → 确认 → 止血 → 恢复 → 关闭（L3 链路）</p></div></div>
+ <div class="card"><div class="tblwrap"><table aria-label="事件列表">
+  <thead><tr><th>事件</th><th>严重度</th><th>状态</th><th>值班人</th><th>状态页</th><th>创建时间</th></tr></thead>
+  <tbody>${D.incidents.map(i=>`
+   <tr class="click" data-act="inc-open" data-id="${i.id}">
+    <td><span class="atitle mono" style="font-size:12px">${i.id}</span> <span class="atitle">${esc(i.title)}</span></td>
+    <td>${sevB(i.sev)}</td><td>${istB(i.status)}</td>
+    <td class="tiny">${i.assignee?esc(i.assignee):'<span class="warm">待认领</span>'}</td>
+    <td>${i.sp==='synced'?'<span class="chip ok-chip"><span class="dot"></span>已同步</span>':'<span class="chip st-closed">—</span>'}</td>
+    <td class="tiny muted">${i.at}</td></tr>`).join('')}
+  </tbody></table></div></div>`;
+}
+function incDetail(i){
+ if(!i)return pageIncidents();
+ const flow=['open','acknowledged','mitigated','resolved','closed'];
+ const idx=flow.indexOf(i.status);
+ const nextAct={open:['确认处理（Ack）','ack'],acknowledged:['止血完成','mit'],mitigated:['根因恢复','res'],resolved:['关闭事件','close']};
+ const na=nextAct[i.status];
+ const kind={auto:'auto',ai:'ai',esc:'esc',man:'man'};
+ return `
+ <div class="ph"><button class="ibtn" data-act="inc-back" aria-label="返回列表" style="margin-top:2px">${ic('chl')}</button>
+  <div style="flex:1"><h1><span class="mono muted" style="font-size:14px">${i.id}</span> ${esc(i.title)}</h1>
+  <p style="display:flex;gap:8px;margin-top:6px;align-items:center">${sevB(i.sev)} ${istB(i.status)} <span class="tiny muted">团队 ${i.team} · ${i.at}</span></p></div>
+  ${na&&can('incident:manage')?`<button class="btn btn-p" data-act="inc-adv" data-id="${i.id}" data-step="${na[1]}">${ic(na[1]==='close'?'check':'arr')}${na[0]}</button>`:''}
+  ${can('ai:approve')?`<button class="btn btn-ai" data-act="agent-go" data-id="${i.id}">${ic('spark')}发起 Agent 调查</button><span class="tag pu" style="align-self:center">P3</span>`:''}
+ </div>
+ <div class="steps" aria-label="事件状态机">
+  ${flow.map((s,n)=>`<div class="stp ${n<idx?'done':n===idx?'cur':''}"><div class="bar"></div><div class="lb">${IST[s][1].split(' ')[0]}</div></div>`).join('')}
+ </div>
+ <div class="grid2" style="margin-top:14px">
+  <div class="card">
+   <div class="card-h">${ic('clock')}事件时间线 <span class="tag">自动 + 人工</span></div>
+   <div style="padding:14px 18px">
+    <div class="tl">${i.timeline.map(e=>`<div class="tli ${kind[e.k]}"><div class="tt num">${e.t}${e.k==='ai'?' · AI 调查':''}${e.k==='esc'?' · 升级链':''}${e.k==='man'?' · 人工':''}</div><div class="tx">${esc(e.x)}</div></div>`).join('')}</div>
+    ${can('incident:manage')?`<form data-act="inc-note" data-id="${i.id}" style="display:flex;gap:8px;margin-top:14px">
+     <input class="inp" style="flex:1" name="note" placeholder="添加处理记录…" aria-label="处理记录" required>
+     <button class="btn btn-sm" type="submit">${ic('plus')}记录</button></form>`:''}
+   </div>
+  </div>
+  <div>
+   <div class="card" style="margin-bottom:var(--s4)">
+    <div class="card-h">${ic('bell')}值班与升级状态</div>
+    <div style="padding:13px 16px" class="linklist">
+     <div class="li" style="cursor:default">${ic('check','width:14px;height:14px;color:var(--green-t)')}<span>L1 电商SRE-Primary · 钉钉已投递<span class="tiny muted" style="display:block">NR-8812 · sent · 5 分钟超时 [TBD-BIZ]</span></span></div>
+     <div class="li" style="cursor:default">${ic('warn','width:14px;height:14px;color:var(--brand-t)')}<span>L2 升级 · 短信已投递并确认<span class="tiny muted" style="display:block">每一步投递与响应留痕（BR-08）· 降级链见 BR-13</span></span></div>
+    </div>
+   </div>
+   <div class="card" style="margin-bottom:var(--s4)">
+    <div class="card-h">${ic('eye')}状态页同步 ${i.sp==='synced'?'<span class="chip ok-chip" style="margin-left:auto"><span class="dot"></span>已同步</span>':'<span class="chip st-closed" style="margin-left:auto">未同步</span>'}</div>
+    <div style="padding:13px 16px;font-size:12.5px" class="muted">
+     ${i.sp==='synced'?`内部状态页「部分功能降级」随事件状态自动更新（BR-06）。${can('incident:manage')?'<div style="margin-top:9px"><button class="btn btn-sm" data-act="sp-wd" data-id="'+i.id+'">'+ic('x')+'撤回同步</button></div>':''}`:'同步已撤回或事件级别未达同步阈值。'}
+    </div>
+   </div>
+   <div class="card">
+    <div class="card-h">${ic('siren')}关联告警 <span class="tag" style="margin-left:auto">${i.alerts.length} 条</span></div>
+    <div style="padding:11px 16px" class="linklist">
+     ${i.alerts.length?i.alerts.map(id=>{const a=D.alerts.find(x=>x.id===id);return a?`<div class="li" data-act="alert-open" data-id="${a.id}">${sevB(a.sev)}<span style="flex:1" class="tiny">${esc(a.title)}</span>${ic('chr','width:13px;height:13px')}</div>`:''}).join(''):'<span class="tiny muted">无关联告警（人工立项）</span>'}
+    </div>
+   </div>
+  </div>
+ </div>`;
+}
+
+/* ============ 巡检看板 ============ */
+function pageInspections(){
+ const fs=D.findings.filter(f=>f.cluster===S.cluster);
+ const bars=[[8,3],[12,5],[6,2],[15,7],[9,4],[11,3],[fs.filter(f=>f.sev!=='P4').length,fs.filter(f=>f.sev==='P4').length]];
+ const max=Math.max(...bars.map(b=>b[0]+b[1]));
+ return `
+ <div class="ph"><div><h1>巡检看板</h1><p>确定性规则扫描（L4 链路）· 最近巡检 12 分钟前 · 规则库 38 条</p></div><div class="sp"></div>
+  <div class="seg" role="group" aria-label="集群筛选">${['prod-cluster-a','staging-cluster'].map(c=>`<button data-act="cluster" data-id="${c}" class="${S.cluster===c?'on':''}">${c}</button>`).join('')}</div></div>
+ <div class="stats">
+  <div class="stat"><div class="l">集群健康分</div><div class="v num">${S.cluster==='prod-cluster-a'?'87':'92'}</div><div class="s">较上次 <b class="up">+2</b></div></div>
+  <div class="stat"><div class="l">open findings</div><div class="v num">${fs.filter(f=>f.st==='open').length}</div><div class="s">warn 以上 <b class="warm">${fs.filter(f=>f.st==='open'&&(f.sev==='P1'||f.sev==='P2'||f.sev==='P3')).length}</b></div></div>
+  <div class="stat"><div class="l">已认领处置中</div><div class="v num">${fs.filter(f=>f.st==='acknowledged').length}</div><div class="s">认领后 72h SLA</div></div>
+  <div class="stat"><div class="l">AI 已解释</div><div class="v num">${fs.filter(f=>f.ai).length}</div><div class="s">info 级不触发 AI（BR-09）</div></div>
+ </div>
+ <div class="grid2">
+ <div class="card" style="margin-bottom:var(--s4)">
+  <div class="card-h">${ic('radar')}最近 7 次巡检 findings 趋势<span class="tiny muted" style="margin-left:auto"><span style="color:var(--brand-t)">■</span> warn+ <span class="muted" style="margin-left:8px;color:var(--teal-t)">■</span> info</span></div>
+  <div style="padding:12px 16px"><div class="bars" role="img" aria-label="最近7次巡检findings柱状图：warn+级与info级堆叠柱">
+   ${bars.map(b=>`<div class="b"><i style="height:${b[0]/max*100}%;background:linear-gradient(180deg,var(--brand-h),var(--brand))"></i><i style="height:${b[1]/max*100}%;background:rgba(0,209,255,.55)"></i><span>r-${bars.indexOf(b)+36}</span></div>`).join('')}
+  </div></div>
+ </div>
+ <div class="card" style="margin-bottom:var(--s4)">
+  <div class="card-h">${ic('shield')}巡检策略 IL-03 · prod 工作负载基线</div>
+  <div style="padding:13px 16px"><dl class="kv">
+   <dt>规则集</dt><dd>k8sgpt analyzer 移植 · 38 条启用</dd>
+   <dt>调度</dt><dd>每 30 分钟 · 队列调度不阻塞告警管道</dd>
+   <dt>ai_explain_level</dt><dd>warn 及以上触发 A1 解释（BR-09）</dd>
+   <dt>warn 转告警</dt><dd>转入 L1 告警管道（converted_to_alert）</dd>
+  </dl></div>
+ </div>
+ </div>
+ <div class="card">
+  <div class="card-h">${ic('warn')}Findings · ${S.cluster}</div>
+  <div class="tblwrap"><table aria-label="巡检发现">
+   <thead><tr><th>规则</th><th>资源</th><th>严重度</th><th>状态</th><th>AI 解释</th><th></th></tr></thead>
+   <tbody>${fs.map(f=>`
+    <tr><td class="mono" style="color:var(--tx-hi)">${f.code}<div class="tiny muted mono" style="margin-top:2px">${f.id}</div></td>
+     <td class="tiny">${esc(f.res)}</td><td>${sevB(f.sev)}</td><td>${f.st==='ignored'?'<span class="chip st-closed"><span class="dot"></span>已忽略</span>':f.st==='open'?'<span class="chip st-notified"><span class="dot"></span>open 待处理</span>':'<span class="chip st-ack"><span class="dot"></span>已认领</span>'}</td>
+     <td>${f.ai?'<span class="chip ai-chip"><span class="dot"></span>已解释</span>':f.info?'<span class="chip st-closed">info 不入 AI</span>':'<span class="chip st-closed">未解释</span>'}</td>
+     <td><div class="rowacts">
+      ${can('finding:claim')&&(S.role!=='developer'||f.res.includes('checkout'))?`<button class="ibtn" data-act="f-claim" data-id="${f.id}" aria-label="认领" data-tooltip="认领（状态机 open→acknowledged）">${ic('check')}</button>`:''}
+      ${f.st==='open'&&can('finding:claim')?`<button class="ibtn" data-act="f-ignore" data-id="${f.id}" aria-label="忽略" data-tooltip="忽略（需填写原因）">${ic('x')}</button>`:''}
+      ${!f.info&&can('ai:view')?`<button class="btn btn-ai btn-sm" data-act="f-ai" data-id="${f.id}">${ic('spark','width:12px;height:12px')}AI 解释</button>`:f.info?`<button class="btn btn-sm" disabled data-tooltip="info 级只入看板不触发 AI（BR-09）">${ic('spark','width:12px;height:12px')}AI 解释</button>`:''}
+     </div></td></tr>
+    ${S.fAi===f.id?f.ai?`<tr><td colspan="6" style="background:rgba(178,54,255,.04)"><div class="aibox">
+      <div class="ah">${ic('spark','width:14px;height:14px')}AI 解释 · ${f.code} <span class="tag pu">已脱敏 BR-01</span></div>${esc(f.ai.text)}
+      <div class="foot">${ic('shield','width:12px;height:12px')} ${esc(f.ai.digest)}<span>·</span>${f.ai.model}<span>·</span>${f.ai.tokens}<span>·</span>AICallLog（BR-10）</div></div></td></tr>`
+     :`<tr><td colspan="6" style="background:rgba(178,54,255,.04)"><div class="aibox" style="border-style:dashed">
+      <div class="ah">${ic('spark','width:14px;height:14px')}正在生成解释…（脱敏 → 模型路由 → 小模型调用）</div>
+      <div class="foot">预算检查通过（BR-03）· 调用将写入 AICallLog（BR-10）</div></div></td></tr>`:''}`).join('')||'<tr><td colspan="6" class="empty">该集群暂无 findings</td></tr>'}
+  </tbody></table></div>
+ </div>`;
+}
+
+/* ============ AI 任务中心 ============ */
+function pageAI(){
+ if(!can('ai:view'))return `<div class="empty">当前角色不可见 AI 任务中心（权限矩阵 §3）</div>`;
+ const tot=D.aiTasks.reduce((s,t)=>s+t.calls,0);
+ return `
+ <div class="ph"><div><h1>AI 任务中心</h1><p>脱敏（BR-01）· 预算（BR-03）· 审批（BR-02/05）· 全量审计（BR-10）· 本地优先（BR-12）</p></div></div>
+ <div class="stats">
+  <div class="stat"><div class="l">本月调用</div><div class="v num">1,842</div><div class="s">巡检解释 78% · 事件调查 19%</div></div>
+  <div class="stat"><div class="l">token 消耗</div><div class="v num">3.4M</div><div class="s">月度预算 <b class="warm">68%</b></div></div>
+  <div class="stat"><div class="l">待审批</div><div class="v num">${D.aiTasks.filter(t=>t.status==='pending_approval').length}</div><div class="s">高危工具 / 生成物（BR-02）</div></div>
+  <div class="stat"><div class="l">本地模型占比</div><div class="v num">100%</div><div class="s">数据不出域 · 默认仅本地（BR-12）</div></div>
+ </div>
+ <div class="card">
+  <div class="card-h">${ic('spark')}任务列表</div>
+  <div class="tblwrap"><table aria-label="AI任务">
+   <thead><tr><th>任务</th><th>类型</th><th>对象</th><th>模型</th><th>预算（calls）</th><th>状态</th><th></th></tr></thead>
+   <tbody>${D.aiTasks.map(t=>`
+    <tr ${t.status==='pending_approval'?'style="background:rgba(178,54,255,.05)"':''}>
+     <td class="mono" style="color:var(--tx-hi)">${t.id}<div class="tiny muted" style="margin-top:2px">by ${esc(t.by)}</div></td>
+     <td><span class="chip ai-chip">${TT[t.type].split(' ')[0]}</span><div class="tiny muted" style="margin-top:2px">${TT[t.type].split(' ')[1]||''}</div></td>
+     <td class="tiny" style="max-width:220px">${esc(t.obj)}${t.note?`<div class="muted" style="margin-top:2px">${esc(t.note)}</div>`:''}</td>
+     <td class="tiny">${esc(t.model)}</td>
+     <td><div class="tiny num">${t.calls}/${t.callsMax} · ${t.tokens}</div><div style="height:4px;border-radius:2px;background:var(--surface-3);margin-top:5px;max-width:120px"><div style="height:100%;border-radius:2px;width:${Math.min(100,t.calls/t.callsMax*100)}%;background:${t.calls/t.callsMax>.9?'var(--red)':'var(--purple)'}"></div></div></td>
+     <td>${tstB(t.status)}</td>
+     <td><div class="rowacts">
+      ${t.status==='pending_approval'&&can('ai:approve')?`<button class="btn btn-p btn-sm" data-act="ai-approve" data-id="${t.id}">审批</button>`:''}
+      ${t.status==='pending_approval'&&!can('ai:approve')?'<span class="tiny muted">需审批权限</span>':''}
+      ${t.id==='TASK-1040'?`<button class="btn btn-sm" data-act="diff" data-id="${t.id}">${ic('file')}YAML diff</button>`:''}
+      <button class="ibtn" data-act="ai-logs" data-id="${t.id}" aria-label="调用链" data-tooltip="查看 AICallLog 调用链（BR-10）">${ic('term')}</button>
+     </div></td></tr>`).join('')}
+  </tbody></table></div>
+ </div>`;
+}
+
+/* ============ Workflow（P3） ============ */
+function pageWF(){
+ if(!can('wf:view'))return `<div class="empty">当前角色不可见 Workflow 编排</div>`;
+ return `
+ <div class="ph"><div><h1>Workflow 编排 <span class="tag pu">P3</span></h1><p>YAML 声明式自动化 · AI 生成仅提议、人工确认后入库（BR-05）· Git 同步可回滚</p></div><div class="sp"></div>
+  ${can('wf:manage')?`<button class="btn btn-ai" data-act="nl-gen">${ic('spark')}NL 生成 Workflow</button>`:''}</div>
+ <div class="card">
+  <div class="card-h">${ic('branch')}编排定义</div>
+  <div class="tblwrap"><table aria-label="Workflow列表">
+   <thead><tr><th>Workflow</th><th>版本</th><th>来源</th><th>触发</th><th>执行次数</th><th>最近执行</th></tr></thead>
+   <tbody>${D.workflows.map(w=>`
+    <tr><td class="mono" style="color:var(--tx-hi)">${w.name}</td><td class="mono">${w.ver}</td>
+     <td>${w.src==='ai_generated'?`<span class="chip ai-chip"><span class="dot"></span>ai_generated</span><span class="tiny muted" style="margin-left:6px">approved_by ${esc(w.by||'')}</span>`:'<span class="chip st-closed">manual</span>'}</td>
+     <td class="tiny">${w.trig}</td><td class="num tiny">${w.runs}</td><td class="tiny muted">${esc(w.last)}</td></tr>`).join('')}
+  </tbody></table></div>
+ </div>
+ <div class="card" style="margin-top:var(--s4)"><div class="card-h">${ic('file')}执行记录 WorkflowRun</div>
+  <div style="padding:12px 16px" class="linklist">
+   <div class="li" style="cursor:default">${ic('check','width:14px;height:14px;color:var(--green-t)')}<span class="tiny"><span class="mono">WF-014 v2</span> · alert 触发 · succeeded · 含高危步骤时进入 waiting_approval（状态机 §6）</span><span class="tiny muted" style="margin-left:auto">今天 13:02</span></div>
+   <div class="li" style="cursor:default">${ic('clock','width:14px;height:14px;color:var(--gold)')}<span class="tiny"><span class="mono">WF-009 v3</span> · manual 触发 · waiting_approval → 批准后 succeeded</span><span class="tiny muted" style="margin-left:auto">昨天 09:14</span></div>
+  </div></div>`;
+}
+
+/* ============ 排班与升级 ============ */
+function pageOncall(){
+ const o=D.oncall;
+ return `
+ <div class="ph"><div><h1>排班与升级</h1><p>轮换 + 临时顶班 · 升级链每级超时自动升级（BR-08）</p></div>
+  ${can('oncall:edit')?'<span class="chip ok-chip" style="align-self:center"><span class="dot"></span>可编辑</span>':'<span class="chip st-closed" style="align-self:center">只读（oncall_manager / admin 可编辑）</span>'}</div>
+ <div class="card" style="margin-bottom:var(--s4)">
+  <div class="card-h">${ic('cal')}本周排班 · 电商SRE <span class="tiny muted" style="margin-left:auto">${esc(o.override)}</span></div>
+  <div style="padding:14px 16px"><div class="week">
+   ${o.days.map((d,n)=>`<div class="day ${n===4?'today':''}"><div class="dn">${d}${n===4?' · 今天':''}</div><div class="who">${o.primary[n]}<small>主班</small></div><div class="who" style="margin-top:6px;font-weight:400;color:var(--tx-3)">${o.secondary[n]}<small>备班</small></div></div>`).join('')}
+  </div></div>
+ </div>
+ <div class="card">
+  <div class="card-h">${ic('warn')}升级策略 · 默认升级链</div>
+  <div class="tblwrap"><table aria-label="升级策略">
+   <thead><tr><th>级别</th><th>目标与渠道</th><th>超时（未确认升级下一级）</th><th>本周触发</th></tr></thead>
+   <tbody>${o.esc.map((e,n)=>`<tr><td style="color:var(--tx-hi)">${e.lv}</td><td class="tiny">${esc(e.target)}</td><td class="tiny num">${e.to}</td><td class="num tiny">${['6','2','0'][n]} 次</td></tr>`).join('')}
+  </tbody></table></div>
+  <div style="padding:11px 16px;border-top:1px solid var(--surface-3)" class="tiny muted">渠道失败自动走降级链（IM → 短信 → 电话，BR-13）· 全部投递与响应产生 NotificationRecord（BR-08）· 本周通知记录 214 条</div>
+ </div>`;
+}
+
+/* ============ 管理后台 ============ */
+function pageAdmin(){
+ if(!can('admin:view'))return `<div class="empty">管理后台仅平台管理员可见（权限矩阵 §3）</div>`;
+ return `
+ <div class="ph"><div><h1>管理后台</h1><p>集群与凭证 · Provider · AI 预算与模型路由 · 凭证不入库，引用密钥管理</p></div></div>
+ <div class="grid2">
+  <div class="card"><div class="card-h">${ic('shield')}集群与凭证</div><div style="padding:12px 16px" class="linklist">
+   <div class="li" style="cursor:default">${ic('check','width:14px;height:14px;color:var(--green-t)')}<span><b style="color:var(--tx-hi)">prod-cluster-a</b> · v1.29 · readonly<span class="tiny muted" style="display:block">凭证 vault:k8s/prod-a-ro（30 天轮换）· 只读基线（BR-02）</span></span></div>
+   <div class="li" style="cursor:default">${ic('warn','width:14px;height:14px;color:var(--gold)')}<span><b style="color:var(--tx-hi)">staging-cluster</b> · v1.28 · 连接失败<span class="tiny muted" style="display:block">探活告警已发 admin，巡检任务标记 failed（§6 降级）</span></span></div>
+  </div></div>
+  <div class="card"><div class="card-h">${ic('inbox')}Provider 接入</div><div style="padding:12px 16px" class="linklist">
+   ${['Alertmanager · source · push','Prometheus · query · poll','钉钉机器人 · action · push','短信网关 · action · push [TBD-BIZ]'].map(p=>`<div class="li" style="cursor:default">${ic('link','width:13px;height:13px')}<span class="tiny">${p}</span></div>`).join('')}
+  </div></div>
+  <div class="card"><div class="card-h">${ic('radar')}巡检规则库</div><div style="padding:13px 16px"><dl class="kv">
+   <dt>规则总数</dt><dd>38 条启用 · 6 大类（workload / node / network / storage / security / config）</dd>
+   <dt>版本适配</dt><dd>按 k8s_version_fit 自动启停</dd>
+   <dt>更新来源</dt><dd>复盘 Action Items 回流（L3 闭环）</dd></dl></div></div>
+  <div class="card"><div class="card-h">${ic('spark')}AI 预算与模型路由</div><div style="padding:13px 16px"><dl class="kv">
+   <dt>任务默认预算</dt><dd>40 次调用 / 100k 输出 tokens（BR-03，管理员可调）</dd>
+   <dt>模型路由</dt><dd style="display:flex;align-items:center;gap:10px">本地优先（Ollama / vLLM）<label class="switch"><input type="checkbox" checked data-act="route-sw" aria-label="本地优先开关"><i></i></label></dd>
+   <dt>数据出域</dt><dd>仅本地 · 出域需显式配置（BR-12）<span class="tag gd" style="margin-left:6px">TBD-BIZ</span></dd></dl></div></div>
+ </div>`;
+}
+
+/* ============ 层（抽屉/弹窗） ============ */
+function renderLayer(){
+ const L=$('hp-layer');
+ let h='';
+ if(S.modal){
+  const m=modals[S.modal]&&modals[S.modal]();
+  if(m)h=`<div class="scrim" data-act="close-layer"></div><div class="modal" role="dialog" aria-modal="true">${m}</div>`;
+ }else if(S.drawer){
+  h=`<div class="scrim" data-act="close-layer"></div><div class="drawer" role="dialog" aria-modal="true" aria-label="告警详情">${renderDrawer()}</div>`;
+ }
+ L.innerHTML=h;
+}
+const modals={
+ suppress(){const a=D.alerts.find(x=>x.id===S.modalArg);if(!a)return'';
+  return `<div class="modal-h">${ic('x','color:var(--tx-2)')}<h3 style="flex:1">抑制建议 · ${esc(a.title)}</h3><button class="ibtn" data-act="close-layer" aria-label="关闭">${ic('x')}</button></div>
+  <div class="modal-b"><p class="muted tiny">标记后告警进入 suppressed，原因沉淀至降噪规则反馈池（告警处置流）。</p>
+  <div class="radios" role="radiogroup" aria-label="抑制原因">
+   ${['误报（规则阈值不合理）','重复（已有事件覆盖）','低价值（无需响应）'].map((r,n)=>`<label><input type="radio" name="sup" value="${n}" ${n===0?'checked':''}>${r}</label>`).join('')}
+  </div><input class="inp" style="width:100%" placeholder="补充说明（可选）"></div>
+  <div class="modal-f"><button class="btn" data-act="close-layer">取消</button><button class="btn btn-p" data-act="suppress-ok" data-id="${a.id}">确认抑制</button></div>`;},
+ reject(){const c=D.candidates.find(x=>x.id===S.modalArg);if(!c)return'';
+  return `<div class="modal-h">${ic('x','color:var(--tx-2)')}<h3 style="flex:1">驳回候选 · ${esc(c.title)}</h3><button class="ibtn" data-act="close-layer" aria-label="关闭">${ic('x')}</button></div>
+  <div class="modal-b"><p class="muted tiny">驳回原因将作为规则 <span class="mono">${c.rule}</span> 的调优输入（候选事件确认流）。</p>
+  <div class="radios" role="radiogroup" aria-label="驳回原因">
+   ${['规则过宽（条件太松，纳入了不相关告警）','时间窗过长（应缩短聚合窗口）','富化字段错误（关联依赖的 team/severity 不准）'].map((r,n)=>`<label><input type="radio" name="rej" value="${n}" ${n===0?'checked':''}>${r}</label>`).join('')}
+  </div></div>
+  <div class="modal-f"><button class="btn" data-act="close-layer">取消</button><button class="btn btn-d" data-act="reject-ok" data-id="${c.id}">确认驳回</button></div>`;},
+ approve(){const t=D.aiTasks.find(x=>x.id===S.modalArg);if(!t)return'';
+  return `<div class="modal-h">${ic('spark','color:var(--purple-t)')}<h3 style="flex:1">AI 审批 · ${t.id}</h3><span class="tag pu">BR-02 / BR-05</span><button class="ibtn" data-act="close-layer" aria-label="关闭">${ic('x')}</button></div>
+  <div class="modal-b">
+   <p>${esc(t.obj)}<span class="muted tiny"> · 发起人 ${esc(t.by)}</span></p>
+   <p class="muted tiny" style="margin-top:8px">${esc(t.reason)}</p>
+   <pre class="code" style="margin-top:12px">$ ${esc(t.tool)}</pre>
+   <dl class="kv" style="margin-top:12px">
+    <dt>预算已消耗</dt><dd class="num">${t.calls}/${t.callsMax} 次调用 · ${t.tokens} tokens（BR-03）</dd>
+    <dt>审批超时</dt><dd>30 分钟未处理自动取消，上下文留存可重发</dd>
+    <dt>模型</dt><dd>${esc(t.model)}（本地，数据不出域 BR-12）</dd>
+   </dl></div>
+  <div class="modal-f"><button class="btn btn-d" data-act="ai-reject" data-id="${t.id}">拒绝（任务终止）</button><button class="btn btn-p" data-act="ai-ok" data-id="${t.id}">${ic('check')}批准执行</button></div>`;},
+ diff(){return `<div class="modal-h">${ic('file','color:var(--purple-t)')}<h3 style="flex:1">Workflow YAML diff · checkout-oom-annotate</h3><span class="tag pu">AI 提议 BR-05</span><button class="ibtn" data-act="close-layer" aria-label="关闭">${ic('x')}</button></div>
+  <div class="modal-b"><p class="muted tiny">AI 生成内容仅具有「提议」地位，确认入库前不得执行（BR-05）。入库后标记 ai_generated + approved_by，并同步 Git 可回滚。</p>
+  <pre class="code" style="margin-top:12px"><span class="del">- version: v2  # manual</span><span class="add">+ version: v3  # ai_generated</span>
+ triggers:
+   - type: alert
+     filters:
+       - alertname: KubePodCrashLooping
+<span class="add">+       - namespace: checkout   # AI 新增：限定命名空间</span>
+ steps:
+   - name: annotate
+     tool: kubectl.annotate
+     args:
+       namespace: checkout
+<span class="add">+   - name: notify-oncall        # AI 新增：通知值班组</span>
+<span class="add">+     tool: dingtalk.send</span>
+<span class="add">+     args: {group: 电商SRE-Primary, template: oom-quick}</span></pre></div>
+  <div class="modal-f"><button class="btn" data-act="close-layer">需要修改（回 AI）</button><button class="btn btn-p" data-act="diff-ok">${ic('check')}确认入库 v3</button></div>`;},
+ nlgen(){return `<div class="modal-h">${ic('spark','color:var(--purple-t)')}<h3 style="flex:1">自然语言生成 Workflow（A3 · P3）</h3><span class="tag pu">BR-05</span><button class="ibtn" data-act="close-layer" aria-label="关闭">${ic('x')}</button></div>
+  <div class="modal-b"><textarea class="inp" style="width:100%;height:72px;padding:10px;font-family:var(--mono);font-size:12px" aria-label="自然语言描述">当 checkout 命名空间出现 Pod CrashLooping 告警时，自动给 Deployment 打上 annotation 并通知电商SRE-Primary 值班组</textarea>
+  <div style="margin-top:10px" class="tiny muted">AI 网关：脱敏（BR-01）→ 预算检查（BR-03）→ 生成 YAML 草稿 → diff 预览</div></div>
+  <div class="modal-f"><button class="btn" data-act="close-layer">取消</button><button class="btn btn-ai" data-act="nl-ok">${ic('spark')}生成草稿并预览 diff</button></div>`;},
+ logs(){const t=D.aiTasks.find(x=>x.id===S.modalArg);if(!t)return'';
+  const logs=t.id==='TASK-1042'
+   ?[['14:05','ctx.build','关联告警×2 + Finding×1 + 最近变更',0.3,'0.4s','ok'],['14:05','kubectl.get pod -n checkout','[masked] pod=*****-x2',1.2,'0.6s','ok'],['14:06','promql: container_oom_walk_total','range 30m · 18 series',2.1,'0.9s','ok'],['14:07','kubectl.delete pod（写类）','— 挂起待审批 —','—','—','pending_approval']]
+   :t.id==='TASK-1041'?[['13:58','sanitize','掩码 5 个敏感字段，映射表存本地（BR-01）',0.1,'0.2s','ok'],['13:58','llm.chat qwen2.5-32b','finding F-202 raw_error 片段',1.1,'0.7s','ok']]
+   :t.id==='TASK-1039'?[['11:02','llm.chat gpt-oss-120b','循环第 38 轮 · 工具输出截断治理','8.2k','2.1s','ok'],['11:04','budget.check','calls 40/40 · tokens 100k/100k → graceful 终止','0','0.0s','budget_exceeded']]
+   :[['14:20','sanitize','掩码 3 个字段',0.1,'0.2s','ok'],['14:21','llm.chat gpt-oss-120b','NL→YAML 草稿生成','4.2k','1.8s','ok'],['14:21','diff.build','与 WF-014 v2 对比','0','0.1s','ok']];
+  return `<div class="modal-h">${ic('term','color:var(--purple-t)')}<h3 style="flex:1">调用链 · ${t.id}</h3><span class="tag">AICallLog · 不可删改 BR-10</span><button class="ibtn" data-act="close-layer" aria-label="关闭">${ic('x')}</button></div>
+  <div class="modal-b"><div class="tblwrap"><table aria-label="调用日志">
+   <thead><tr><th>时间</th><th>tool_used</th><th>prompt_digest（已脱敏）</th><th>tokens</th><th>延迟</th><th>结果</th></tr></thead>
+   <tbody>${logs.map(l=>`<tr><td class="tiny num">${l[0]}</td><td class="mono tiny" style="color:var(--tx-hi)">${esc(l[1])}</td><td class="tiny">${esc(l[2])}</td><td class="tiny num">${l[3]}</td><td class="tiny num">${l[4]}</td><td class="tiny ${l[5]==='ok'?'up':'warm'}">${l[5]}</td></tr>`).join('')}
+  </tbody></table></div>
+  <p class="tiny muted" style="margin-top:12px">who / when / what / cost 全量留痕；审计日志不可删改（BR-10）。</p></div>
+  <div class="modal-f"><button class="btn" data-act="close-layer">关闭</button></div>`;},
+};
+
+/* ============ 主渲染 ============ */
+const PAGES={alerts:pageAlerts,candidates:pageCandidates,incidents:pageIncidents,inspections:pageInspections,ai:pageAI,workflows:pageWF,oncall:pageOncall,admin:pageAdmin};
+function render(){
+ renderNav();
+ $('hp-view').innerHTML=(PAGES[S.page]||pageAlerts)();
+ renderLayer();
+}
+
+/* ============ 动作 ============ */
+function findAlert(id){return D.alerts.find(a=>a.id===id)}
+function advanceInc(id,step){
+ const i=D.incidents.find(x=>x.id===id);if(!i)return;
+ const t=new Date();const hh=String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0');
+ const map={ack:['acknowledged','确认处理（Ack），升级链停止'],mit:['mitigated','止血完成'],res:['resolved','根因恢复，服务恢复正常'],close:['closed','事件关闭']};
+ i.status=map[step][0];
+ i.timeline.push({t:hh,k:'man',x:ROLE_NAME[S.role]+' '+map[step][1]});
+ if(step==='res'){toast('状态页已恢复更新','事件 resolved，状态页自动同步恢复信息（BR-06）','ok');i.sp='synced';}
+ if(step==='close'&&(i.sev==='P1'||i.sev==='P2')){toast('复盘模板已生成','P1/P2 事件关闭前生成 Postmortem 模板，时间线自动汇总，Action Items 待分派（L3 链路）','ai');i.timeline.push({t:hh,k:'auto',x:'复盘模板已生成，复盘结论将回流：关联/富化/巡检规则与 runbook'});}
+ else toast('事件状态已更新',map[step][1]+' · 已写入时间线与审计日志（BR-10）','ok');
+ render();
+}
+function createIncident(title,sev,alerts,from){
+ const id='INC-'+(S.incSeq++);
+ D.incidents.unshift({id,sev,title,status:'open',assignee:null,team:'电商-交易',sp:'synced',at:'刚刚',alerts,timeline:[{t:'刚刚',k:'auto',x:from}]});
+ return id;
+}
+
+root.addEventListener('click',e=>{
+ const el=e.target.closest('[data-act]');if(!el)return;
+ const act=el.dataset.act,id=el.dataset.id;
+ switch(act){
+  case 'nav':S.page=id;S.incView=null;render();break;
+  case 'alert-open':openDrawer(findAlert(id));break;
+  case 'tab':S.drawerTab=id;renderLayer();break;
+  case 'close-layer':S.drawer=null;S.modal=null;renderLayer();break;
+  case 'sevf':S.sev=id;render();break;
+  case 'ack':{const a=findAlert(id);a.status='acked';if(S.drawer===id)S.drawerTab='detail';toast('告警已认领','Ack 后升级链停止（BR-08）· 处置留痕（BR-10）','ok');render();break;}
+  case 'closealert':{const a=findAlert(id);a.status='closed';toast('告警已关闭','人工关闭已记录（who/when/what）','ok');render();break;}
+  case 'toinc':{const a=findAlert(id);const inc=createIncident(a.title.replace(/\s·\s.*/,'')+' 告警立项',a.sev,[a.id],'告警 '+a.id+' 人工转事件立项（告警处置流）');a.status='correlated';a.inc=inc;S.drawer=null;S.page='incidents';S.incView=inc;render();toast('事件已立项',inc+' · 状态页已自动同步（BR-06）','ok');break;}
+  case 'suppress':S.modal='suppress';S.modalArg=id;renderLayer();break;
+  case 'suppress-ok':{const a=findAlert(id);a.status='suppressed';S.modal=null;renderLayer();render();toast('已进入降噪反馈池','抑制原因将用于降噪规则调优（告警处置流）','warn');break;}
+  case 'simulate':{if(S.pipeline)return;S.pipeline={running:true,step:0};render();
+   const iv=setInterval(()=>{S.pipeline.step++;if(S.pipeline.step>=4){clearInterval(iv);
+    D.alerts.unshift({id:'AL-2049',sev:'P2',title:'KubePodNotScheduled · inventory-svc',provider:'Alertmanager',fp:'alertname=KubePodNotScheduled,namespace=inventory,pod=inv-6c8d9-pq5',count:3,team:'电商-交易',env:'prod',status:'notified',at:'刚刚',note:'fingerprint[alertname,namespace] 部分相同合并 ×3',ai:null});
+    S.pipeline={running:false,step:0};render();
+    toast('新告警已接入','KubePodNotScheduled · 去重合并 ×3 → 富化 → 未命中关联，独立通知（L1 链路）','ok');}
+    else render();},650);break;}
+  case 'cand-ok':{const c=D.candidates.find(x=>x.id===id);D.candidates=D.candidates.filter(x=>x.id!==id);
+   const inc=createIncident(c.title,c.members[0].sev,['AL-2041','AL-2045'],'候选事件 '+c.id+' 经人工确认立项（BR-04）· 命中规则 '+c.rule);
+   S.page='incidents';S.incView=inc;render();toast('候选已确认立项',inc+' 已创建 · 状态页自动同步（BR-06）','ok');break;}
+  case 'cand-no':S.modal='reject';S.modalArg=id;renderLayer();break;
+  case 'reject-ok':{D.candidates=D.candidates.filter(x=>x.id!==id);S.modal=null;renderLayer();render();toast('候选已驳回','驳回原因已回流至规则调优队列（候选事件确认流）','warn');break;}
+  case 'inc-open':S.incView=id;render();break;
+  case 'inc-back':S.incView=null;render();break;
+  case 'inc-adv':advanceInc(id,el.dataset.step);break;
+  case 'sp-wd':{const i=D.incidents.find(x=>x.id===id);i.sp='none';render();toast('状态页同步已撤回','人工撤回动作已记录（BR-06 支持撤回）','warn');break;}
+  case 'agent-go':{const t={id:'TASK-1043',type:'investigate',obj:id+' · Agent 自动调查',model:'gpt-oss-120b（本地 vLLM）',status:'running',calls:1,callsMax:40,tokens:'2k / 100k',by:ROLE_NAME[S.role],note:'上下文已构造：关联告警 + Finding + 拓扑标签 + 最近变更（脱敏 BR-01）'};
+   D.aiTasks.unshift(t);S.page='ai';render();
+   toast('Agent 调查已启动',t.id+' · 只读工具循环中，高危工具将挂起待审批','ai');
+   setTimeout(()=>{if(D.aiTasks[0]===t){t.status='pending_approval';t.note='Agent 请求调用写类工具 → 挂起 pending_approval（BR-02）';t.tool='kubectl delete pod checkout-7d9f4-x2 -n checkout';t.reason='Pod 持续 OOMKilled，Agent 判定需删除重建，该工具为写类高危工具。';t.calls=9;t.tokens='21k / 100k';render();toast('AI 任务待审批',t.id+' 请求高危工具，请前往 AI 任务中心审批（BR-02）','ai',{label:'前往 AI 任务中心',act:'go-ai',id:''});}},2200);break;}
+  case 'go-ai':S.page='ai';S.drawer=null;S.modal=null;render();break;
+  case 'cluster':S.cluster=id;S.fAi=null;render();break;
+  case 'f-claim':{const f=D.findings.find(x=>x.id===id);f.st='acknowledged';render();toast('Finding 已认领','状态机 open→acknowledged · 处置中可推进 in_progress','ok');break;}
+  case 'f-ignore':{const f=D.findings.find(x=>x.id===id);f.st='ignored';render();toast('Finding 已忽略','原因已记录（状态机 open→ignored）','warn');break;}
+  case 'f-ai':{const f=D.findings.find(x=>x.id===id);if(S.fAi===id){S.fAi=null;render();break;}
+   S.fAi=id;
+   if(!f.ai){render();setTimeout(()=>{if(S.fAi===id){f.ai={model:'qwen2.5-14b（本地 vLLM）',tokens:'0.9k 输出 tokens · 0.6s',text:'基于结构化 raw_error（确定性强、幻觉面最小）：建议优先核对资源配额与探针配置；如为瞬态故障，观察两个巡检周期是否复现后再处置。',digest:'输入仅错误片段，敏感字段已掩码（BR-01）'};render();}},1400);}else render();break;}
+  case 'ai-approve':S.modal='approve';S.modalArg=id;renderLayer();break;
+  case 'ai-ok':{const t=D.aiTasks.find(x=>x.id===id);t.status='running';t.calls++;S.modal=null;renderLayer();render();
+   toast('已批准执行',t.id+' 继续运行 · 审批动作已写入审计（BR-10）','ok');
+   setTimeout(()=>{t.status='completed';t.note='高危步骤执行完成，RCA 报告已回写 '+t.obj.split(' ')[0]+' 时间线（证据引用：工具调用+原始输出）';
+    const inc=D.incidents.find(x=>x.id===t.obj.split(' ')[0]);
+    if(inc)inc.timeline.push({t:'14:15',k:'ai',x:'AI 调查报告（'+t.id+'）：RCA 判定 OOMKilled 由 v2.31.0 内存泄漏引入；证据：kubectl describe ×2、promql ×3（每个结论带证据引用）'});
+    render();toast('Agent 调查完成','RCA 已回写事件时间线并通知值班人 · AICallLog 全量留痕','ai');},2400);break;}
+  case 'ai-reject':{const t=D.aiTasks.find(x=>x.id===id);t.status='cancelled';S.modal=null;renderLayer();render();toast('AI 任务已拒绝','任务终止，上下文留存可重发（BR-02 审批流）','warn');break;}
+  case 'ai-logs':S.modal='logs';S.modalArg=id;renderLayer();break;
+  case 'diff':S.modal='diff';renderLayer();break;
+  case 'diff-ok':{const w=D.workflows.find(x=>x.name==='checkout-oom-annotate');if(w){w.ver='v3';w.src='ai_generated';w.by=ROLE_NAME[S.role];}S.modal=null;renderLayer();render();toast('Workflow 已入库','v3 · 标记 ai_generated · approved_by 当前用户（BR-05）· 已同步 Git','ai');break;}
+  case 'nl-gen':S.modal='nlgen';renderLayer();break;
+  case 'nl-ok':S.modal='diff';renderLayer();break;
+  case 'route-sw':toast('模型路由配置','本地优先开关已记录变更（BR-12 · admin 操作留痕）','ai');break;
+ }
+});
+root.addEventListener('submit',e=>{
+ const f=e.target.closest('[data-act]');if(!f)return;e.preventDefault();
+ if(f.dataset.act==='inc-note'){const i=D.incidents.find(x=>x.id===f.dataset.id);const v=f.querySelector('input').value.trim();if(!v)return;
+  const t=new Date();const hh=String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0');
+  i.timeline.push({t:hh,k:'man',x:ROLE_NAME[S.role]+'：'+v});render();}
+});
+root.addEventListener('change',e=>{
+ if(e.target.id==='hp-stf'){S.st=e.target.value;render();}
+});
+root.addEventListener('input',e=>{
+ if(e.target.id==='hp-q'){S.q=e.target.value.toLowerCase().trim();if(S.page!=='alerts'){S.page='alerts';}render();
+  const q=$('hp-q');if(q){q.focus();q.setSelectionRange(q.value.length,q.value.length);}}
+});
+$('hp-role').addEventListener('change',e=>{
+ S.role=e.target.value;S.page=can('admin:view')||S.page!=='admin'?S.page:'alerts';
+ if(S.page==='candidates'&&!can('candidate:view'))S.page='alerts';
+ if(S.page==='ai'&&!can('ai:view'))S.page='alerts';
+ if(S.page==='workflows'&&!can('wf:view'))S.page='alerts';
+ S.drawer=null;S.modal=null;render();
+ toast('角色已切换','当前身份：'+ROLE_NAME[S.role]+' · 按权限矩阵（领域模型 §3）过滤界面与操作','warn');
+});
+$('hp-bell').addEventListener('click',()=>{
+ toast('通知中心','3 条未读：INC-1007 升级 L2 · TASK-1042 待审批 · gpu-node-03 候选事件待确认','ai');
+});
+
+render();
+})();
+</script>
+<style>html,body{margin:0;height:100%;background:#0b0c0d}#hp{height:100vh;border-left:none;border-right:none;border-top:none;border-bottom:none}</style>
+</body>
+</html>
