@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>企业 SRE 运维平台开源对标分析报告</title>
+<style>
+  :root {
+    --bg: #f6f8fb;
+    --surface: #ffffff;
+    --text: #1e293b;
+    --text-muted: #64748b;
+    --primary: #1d4ed8;
+    --primary-soft: #eff6ff;
+    --border: #e2e8f0;
+    --warn-bg: #fffbeb;
+    --warn-border: #f59e0b;
+    --warn-text: #92400e;
+    --ok-bg: #f0fdf4;
+    --ok-border: #22c55e;
+    --ok-text: #166534;
+    --code-bg: #f1f5f9;
+    --holmes: #7c3aed;
+    --k8sgpt: #0284c7;
+    --oneuptime: #ea580c;
+    --keep: #16a34a;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 64px; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", Roboto, sans-serif;
+    font-size: 15px; line-height: 1.75;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+
+  /* Header */
+  header.hero {
+    background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 60%, #1d4ed8 100%);
+    color: #fff; padding: 48px 0 40px;
+  }
+  header.hero h1 { margin: 0 0 12px; font-size: 30px; line-height: 1.3; }
+  header.hero .sub { color: #c7d7f8; font-size: 15px; max-width: 860px; }
+  .meta-badges { margin-top: 20px; display: flex; flex-wrap: wrap; gap: 8px; }
+  .meta-badges span {
+    background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.25);
+    border-radius: 999px; padding: 3px 14px; font-size: 13px; color: #e2e8f0;
+  }
+
+  /* Nav */
+  nav.toc {
+    position: sticky; top: 0; z-index: 50; background: rgba(255,255,255,.92);
+    backdrop-filter: blur(8px); border-bottom: 1px solid var(--border);
+  }
+  nav.toc .wrap { display: flex; flex-wrap: wrap; gap: 2px; padding-top: 8px; padding-bottom: 8px; }
+  nav.toc a {
+    color: var(--text-muted); text-decoration: none; font-size: 13px;
+    padding: 5px 12px; border-radius: 8px; white-space: nowrap;
+  }
+  nav.toc a:hover { background: var(--primary-soft); color: var(--primary); }
+
+  /* Sections */
+  main { padding: 32px 0 56px; }
+  section { margin-bottom: 56px; }
+  h2 {
+    font-size: 24px; margin: 0 0 6px; color: #0f172a;
+    padding-left: 14px; border-left: 5px solid var(--primary);
+  }
+  h2 .en { color: var(--text-muted); font-size: 14px; font-weight: normal; margin-left: 10px; }
+  h3 { font-size: 18px; margin: 28px 0 10px; color: #0f172a; }
+  p { margin: 10px 0; }
+  a { color: var(--primary); }
+
+  .lead { font-size: 16px; color: var(--text); }
+  .key-points { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; margin: 18px 0; }
+  .key-point {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    padding: 16px 18px;
+  }
+  .key-point .num {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 26px; height: 26px; border-radius: 50%; background: var(--primary); color: #fff;
+    font-size: 14px; font-weight: 600; margin-right: 8px;
+  }
+  .key-point b { color: #0f172a; }
+
+  /* Cards */
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; padding: 22px 24px; margin: 16px 0;
+    box-shadow: 0 1px 3px rgba(15,23,42,.04);
+  }
+
+  /* Tables */
+  .tbl-wrap { overflow-x: auto; margin: 14px 0; }
+  table { border-collapse: collapse; width: 100%; background: var(--surface); font-size: 14px; }
+  th, td { border: 1px solid var(--border); padding: 9px 12px; text-align: left; vertical-align: top; }
+  th { background: #f1f5f9; color: #0f172a; font-weight: 600; white-space: nowrap; }
+  tbody tr:nth-child(even) { background: #fafbfd; }
+  td b { color: #0f172a; }
+
+  /* Project section header */
+  .proj-head { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 4px; }
+  .proj-dot { width: 14px; height: 14px; border-radius: 4px; margin-top: 9px; flex: none; }
+  .proj-facts { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 4px; }
+  .proj-facts span {
+    font-size: 13px; padding: 2px 12px; border-radius: 999px;
+    background: var(--surface); border: 1px solid var(--border); color: var(--text-muted);
+  }
+
+  /* Callouts */
+  .callout { border-radius: 12px; padding: 14px 18px; margin: 14px 0; font-size: 14px; }
+  .callout.warn { background: var(--warn-bg); border: 1px solid var(--warn-border); color: var(--warn-text); }
+  .callout.ok { background: var(--ok-bg); border: 1px solid var(--ok-border); color: var(--ok-text); }
+  .callout.info { background: var(--primary-soft); border: 1px solid #bfdbfe; color: #1e3a8a; }
+  .callout b { font-weight: 600; }
+
+  code {
+    font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+    background: var(--code-bg); border-radius: 5px; padding: 1px 6px; font-size: 13px; color: #334155;
+  }
+
+  /* AI paradigm cards */
+  .paradigms { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin: 16px 0; }
+  .paradigm { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; }
+  .paradigm .tag { font-size: 12px; font-weight: 600; letter-spacing: .05em; color: var(--primary); }
+  .paradigm h4 { margin: 6px 0 8px; font-size: 15px; color: #0f172a; }
+  .paradigm p { font-size: 13.5px; color: var(--text-muted); margin: 6px 0; }
+  .paradigm .who { font-size: 12.5px; color: var(--primary); }
+
+  ul.clean { padding-left: 20px; margin: 8px 0; }
+  ul.clean li { margin: 6px 0; }
+  ol { padding-left: 22px; margin: 8px 0; }
+  ol li { margin: 6px 0; }
+
+  /* Roadmap phase */
+  .phase-label { font-weight: 600; color: var(--primary); white-space: nowrap; }
+
+  footer {
+    border-top: 1px solid var(--border); padding: 24px 0 40px;
+    color: var(--text-muted); font-size: 13px;
+  }
+  .refs li { margin: 4px 0; font-size: 14px; word-break: break-all; }
+
+  @media (max-width: 640px) {
+    header.hero h1 { font-size: 24px; }
+    h2 { font-size: 20px; }
+    body { font-size: 14.5px; }
+  }
+  @media print {
+    nav.toc { display: none; }
+    body { background: #fff; }
+    .card, .key-point, .paradigm { box-shadow: none; break-inside: avoid; }
+    section { margin-bottom: 32px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <h1>企业 SRE 运维平台开源对标分析报告</h1>
+    <div class="sub">分析对象：HolmesGPT · k8sgpt · OneUptime · Keep —— 提炼对企业真正提效的功能与 AI 应用设计，为自研「企业内部、基于 K8s 的 SRE 运维平台」提供依据。</div>
+    <div class="meta-badges">
+      <span>📅 2026-10-24</span>
+      <span>🔬 方法：并行研究代理抓取 GitHub README 与官方文档一手页面（30+ 页）</span>
+      <span>🎯 用途：功能参考 + AI 应用设计</span>
+      <span>📐 本平台技术栈：Python + FastAPI / React + TS</span>
+    </div>
+  </div>
+</header>
+
+<nav class="toc">
+  <div class="wrap">
+    <a href="#summary">执行摘要</a>
+    <a href="#holmesgpt">HolmesGPT</a>
+    <a href="#k8sgpt">k8sgpt</a>
+    <a href="#oneuptime">OneUptime</a>
+    <a href="#keep">Keep</a>
+    <a href="#ai-patterns">AI 范式对比</a>
+    <a href="#roadmap">落地建议</a>
+    <a href="#refs">参考资料</a>
+  </div>
+</nav>
+
+<main class="wrap">
+
+<!-- ============ 执行摘要 ============ -->
+<section id="summary">
+  <h2>0. 执行摘要<span class="en">Executive Summary</span></h2>
+  <p class="lead">四个项目恰好覆盖企业 SRE 平台的四个支柱：</p>
+  <div class="key-points">
+    <div class="key-point"><span class="num">1</span><b>HolmesGPT</b> —— AI 排障 Agent：自主调查、工具调用、安全护栏的机制标杆</div>
+    <div class="key-point"><span class="num">2</span><b>k8sgpt</b> —— K8s 诊断引擎：SRE 经验规则化 + AI 解释</div>
+    <div class="key-point"><span class="num">3</span><b>OneUptime</b> —— 监控与事件管理底座：拨测、on-call、incident、遥测存储</div>
+    <div class="key-point"><span class="num">4</span><b>Keep</b> —— 告警接入与编排：provider 抽象、降噪、workflow 引擎、AI 生成编排</div>
+  </div>
+
+  <div class="callout info">
+    <b>三条核心判断：</b>
+    <ol>
+      <li>对企业提效最大的不是「AI 问答」，而是<b>确定性自动化</b>：规则化巡检、告警去重降噪、on-call 升级链、workflow 编排——不依赖大模型、效果可度量，应最先落地；AI 在其上做「解释与调查」放大价值。</li>
+      <li>AI 的正确用法是<b>「窄权限 + 确定性外壳」</b>：四个项目无一例外把 LLM 关在笼子里（脱敏、只读默认、LLM 无写权限、人工审批、调用预算）。这套安全护栏设计模式比单个功能更值得抄。</li>
+      <li>技术栈契合度决定参考方式：<b>Keep（FastAPI + React）</b>与本平台同构，代码可直接复用；<b>k8sgpt（Go）</b>移植规则集与脱敏算法；<b>OneUptime（TS）</b>只学架构与数据模型；<b>HolmesGPT（Python）</b>学机制设计。</li>
+    </ol>
+  </div>
+
+  <h3>四项目总览对比</h3>
+  <div class="tbl-wrap">
+  <table>
+    <thead><tr><th>维度</th><th>HolmesGPT</th><th>k8sgpt</th><th>OneUptime</th><th>Keep</th></tr></thead>
+    <tbody>
+      <tr><td><b>定位</b></td><td>开源 SRE Agent，AI 自主调查生产事故</td><td>扫描 K8s 集群、诊断并分诊问题的 AI 工具</td><td>开源一体化可观测 + 事件管理（Datadog 替代）</td><td>开源 AIOps 告警管理（「监控工具的 GitHub Actions」）</td></tr>
+      <tr><td><b>CNCF</b></td><td>Sandbox（2025-10 接纳）</td><td>Sandbox（2023-12 接纳）</td><td>—</td><td>—</td></tr>
+      <tr><td><b>License</b></td><td>Apache-2.0</td><td>Apache-2.0</td><td>Apache-2.0 + <code>ee/</code> 企业版</td><td>MIT + <code>ee/</code>（Open Core，SSO/RBAC 收费）</td></tr>
+      <tr><td><b>技术栈</b></td><td>Python（CLI/server/operator 三形态）</td><td>Go</td><td>TypeScript monorepo</td><td><b>Python FastAPI + React/Next.js</b> ⭐</td></tr>
+      <tr><td><b>Stars（2026-10）</b></td><td>数千量级（口径不一）</td><td>~8.3k</td><td>~7.7k</td><td>~12.4k</td></tr>
+      <tr><td><b>对本平台最大价值</b></td><td>AI 工具调用机制与安全护栏</td><td>analyzer 规则集 + 脱敏机制</td><td>on-call / 事件 / 拨测 / 存储分层</td><td>provider 抽象 + workflow 引擎 + AI 生成编排</td></tr>
+      <tr><td><b>AI 应用范式</b></td><td>Agent 循环自主调查</td><td>规则找问题、AI 解释</td><td>AI 调查 + 修复 PR 全闭环</td><td>自然语言→YAML 编排 + AI 步骤</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<!-- ============ HolmesGPT ============ -->
+<section id="holmesgpt">
+  <h2>1. HolmesGPT<span class="en">AI 排障 Agent 的机制标杆</span></h2>
+  <div class="proj-head">
+    <div class="proj-dot" style="background: var(--holmes);"></div>
+    <p><b>定位：</b>开源 SRE Agent，用 agentic loop 对接实时可观测数据自动调查生产事故、定位根因。官方明确「agentic 调查而非静态 runbook」。</p>
+  </div>
+  <div class="proj-facts">
+    <span>CNCF Sandbox</span><span>Apache-2.0</span><span>Python</span><span>CLI / HTTP server / K8s operator 三形态同内核</span>
+  </div>
+
+  <h3>1.1 真正提效的功能（按落地价值排序）</h3>
+  <div class="tbl-wrap">
+  <table>
+    <thead><tr><th style="width:36px">#</th><th style="width:30%">功能</th><th>为什么提效</th><th style="width:26%">企业落地注意点</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td><b>YAML 声明式 Toolset</b>：一个 <code>toolsets:</code> YAML 把任意 shell 命令暴露为 LLM 工具（<code>{{ var }}</code> 由 LLM 推断、<code>${ENV}</code> 隐藏凭据、prerequisites 预检）</td><td>企业内部专有系统（CMDB、发布系统、内部 API）<b>零代码</b>接入 AI 排障</td><td>bash 命令在容器内执行，需配套镜像与权限治理</td></tr>
+      <tr><td>2</td><td><b>HTTP Connectors</b>：YAML 把任意 REST API 变成 LLM 工具，带端点白名单（仅允许批准的 host/path/method）</td><td>安全等级要求高的内部 API 精确放行，而非全开</td><td>白名单维护成本</td></tr>
+      <tr><td>3</td><td><b>告警自动调查 + 回写闭环</b>：从 AlertManager / PagerDuty / OpsGenie / Jira 拉告警 → 调查 → <code>--update</code> 回写工单/Slack</td><td>直接实现「告警 → AI 预诊断 → 结果回流」的值班减负场景</td><td>PagerDuty/Jira 集成走 CLI 而非服务端 API，编排需自行包装</td></tr>
+      <tr><td>4</td><td><b>K8s 默认只读 + 复用平台 RBAC</b>：内置工具只读、尊重 K8s RBAC / Grafana 角色 / 云 IAM；写操作经独立 Remediation MCP 显式 opt-in</td><td>企业安全评审最容易通过的设计，可直接抄为平台安全基线</td><td>写操作 opt-in 需配套审批制度</td></tr>
+      <tr><td>5</td><td><b>大输出治理</b>：服务端过滤聚合、JSON 树限深、per-tool 内存上限（默认 800MB）、OOM 时输出 <code>[OOM]</code> 提示引导 LLM 收窄重试，超大结果落盘可恢复</td><td>防止「一次查询撑爆上下文/内存」，AI 平台生产化的关键工程细节</td><td><code>llm_summarize</code> 已被官方标记 legacy（有损）；macOS ulimit 不生效</td></tr>
+      <tr><td>6</td><td><b>HealthCheck CRD 主动巡检</b>：自然语言 query 定义巡检项，K8s 原生管理（一次性/定时/部署验证/事件触发），可嵌入 CI/CD</td><td>「巡检项即代码」，开发自测、上线验证都能用</td><td>巡检频率放大 LLM 成本，需按巡检项分级选模型</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>1.2 AI 运用亮点</h3>
+  <div class="card">
+    <ul class="clean">
+      <li><b>告警 → Agent 循环完整链路</b>：告警 label/annotation + <code>generatorURL</code> 构造初始 prompt → LLM 自主选择 toolset 工具 → 执行 shell/HTTP → 输出回注上下文循环，直至产出根因 + 修复建议。API 暴露 <code>conversation_history</code>、<code>tool_calls</code>、<code>follow_up_actions</code>，支持 <code>response_format</code>（strict JSON schema）供程序消费。</li>
+      <li><b>工具审批</b>（<code>enable_tool_approval</code>）：高危工具调用前插人工审批，或让 LLM 对被禁工具自纠错换路径。</li>
+      <li><b>企业制度注入</b>：<code>additional_system_prompt</code> 与 behavior controls 把内部运维规范写进 Agent 行为约束。</li>
+      <li><b>运行时依赖图</b>：从 trace span、K8s ownership、Prometheus label 推断上下游，<b>无需人工维护拓扑</b>。</li>
+      <li><b>零幻觉可视化</b>：图表由原始查询数据直通客户端渲染，LLM 不产出数值，杜绝编图。</li>
+      <li><b>全链路审计</b>：OpenTelemetry 导出完整 prompt / 工具调用 / 答案链路，满足合规审计。</li>
+      <li><b>公开评测体系</b>：150+ 场景 benchmark、模型对比、历史结果公开——AI 功能可度量而非 demo。</li>
+    </ul>
+  </div>
+
+  <h3>1.3 工程实践亮点</h3>
+  <p>CLI / server / operator 三形态同一内核；扩展靠 custom toolsets YAML、HTTP/DB 连接器、远程/OAuth MCP、自定义镜像。工具子进程内存隔离 + 落盘 spill，是 AI 平台少见的工程化深度。</p>
+  <div class="callout warn"><b>不建议照搬：</b>Slack/Teams 双向集成依赖 Robusta 商业平台，开源版能力不完整；作为「被集成引擎」其服务端 API 较薄，适合借鉴机制后自建服务层。admin reload 端点文档自述未鉴权（需网络层限制）；system prompt 原文在源码内未公开。</div>
+</section>
+
+<!-- ============ k8sgpt ============ -->
+<section id="k8sgpt">
+  <h2>2. k8sgpt<span class="en">诊断引擎与「确定性外壳」范式</span></h2>
+  <div class="proj-head">
+    <div class="proj-dot" style="background: var(--k8sgpt);"></div>
+    <p><b>定位：</b>扫描 K8s 集群、诊断并用简单英语分诊问题（"scanning your Kubernetes clusters, diagnosing and triaging issues in simple English"）。</p>
+  </div>
+  <div class="proj-facts">
+    <span>CNCF Sandbox（2023-12）</span><span>Apache-2.0</span><span>Go</span><span>CLI + operator 双形态</span><span>~8.3k stars</span>
+  </div>
+
+  <h3>2.1 真正提效的功能</h3>
+  <div class="tbl-wrap">
+  <table>
+    <thead><tr><th style="width:36px">#</th><th style="width:30%">功能</th><th>为什么提效</th><th style="width:26%">企业落地注意点</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td><b>内置 analyzer（SRE 经验代码化）</b>：确定性规则扫描集群错误（默认 14 个：pod/pvc/deployment/node/webhook/service/ingress/netpol 等；hpa/log/security/gateway/karpenter 可选），输出结构化原始错误</td><td>自研「体检引擎」可直接移植其规则集与输出 schema，覆盖面现成</td><td>规则需随 K8s 版本持续维护</td></tr>
+      <tr><td>2</td><td><b>Anonymization 脱敏</b>：<code>--anonymize</code> 发 AI 前把对象名/namespace 等替换为掩码，返回后再本地映射还原</td><td>企业合规刚需（数据不出域），机制可直接抄</td><td>掩码会丢失对排障有用的命名语义</td></tr>
+      <tr><td>3</td><td><b>多 AI backend 抽象</b>：一套 prompt 层对接 16+ 后端（openai/azure/bedrock/ollama/localai/litellm/customrest…），含 NoOpAI 测试档</td><td>避免厂商锁定；Ollama/LocalAI 支持内网数据不出域</td><td>各家输出质量需评测</td></tr>
+      <tr><td>4</td><td><b>Operator 常驻 + Result CR + sink</b>：CRD 定义 backend/interval/filters/sink，巡检结果落为 K8s 资源并推送 Slack/Mattermost/CloudEvents</td><td>一次性 CLI 变持续巡检，对应「定时巡检 + 告警降噪」模块</td><td>operator 的 Prometheus/Alertmanager 集成细节文档不全（待确认）</td></tr>
+      <tr><td>5</td><td><b>Filters + 自定义 analyzer</b>：按范围裁剪扫描；任意语言经 schema/proto 扩展规则</td><td>接入企业内部业务规则与自研检查项</td><td>需团队持续投入规则运营</td></tr>
+      <tr><td>6</td><td><b>Trivy 集成</b>：<code>k8sgpt integrate</code> 复用成熟安全扫描器输出漏洞类 finding</td><td>安全能力不重造轮子</td><td>—</td></tr>
+      <tr><td>7</td><td><b>Auto-remediation（alpha，opt-in）</b>：<b>"LLM never receives write authority"</b>——LLM 只产出意图，operator 自行计算 JSON patch、先 dry-run、只允许窄路径修复</td><td>「AI 修复建议」的安全边界范本</td><td>alpha 阶段，能力有限</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>2.2 AI 运用亮点</h3>
+  <div class="callout ok">
+    <b>最大设计洞察——人机分工：</b>analyzer（确定性代码）连接 K8s API 归因错误事件 → 产出结构化原始错误；AI 仅在 <code>--explain</code> 环节把原始错误<b>翻译</b>为可读诊断 + 修复建议。即<b>「规则找问题、AI 解释问题」</b>——幻觉面小、token 成本低、结果可复现。
+  </div>
+  <div class="card">
+    <ul class="clean">
+      <li><b>只发送错误片段而非全量 dump</b>：上下文极小，成本与隐私双重收益。</li>
+      <li><b>脱敏链路完整</b>：脱敏 → 发 AI → 返回 → 本地映射还原；operator CRD 也有 <code>anonymized</code> 字段，常驻模式同样生效。</li>
+      <li><b>NoOpAI 后端</b>：不出 AI 解释、只出原始结果，便于 CI 管道测试。</li>
+      <li>⚠️ 待确认：完整 prompt 模板未从一手页面获取，落地前需读源码复核。</li>
+    </ul>
+  </div>
+
+  <h3>2.3 工程实践亮点</h3>
+  <p>Go 单二进制 CLI 与 operator <b>共享同一 analyzer 核心</b>：同一能力既服务人工排查又服务常驻巡检。定位是「可被平台集成的诊断引擎」而非终端产品：serve 模式（gRPC）、MCP server（12 个工具）、远程缓存（S3/Azure/GCS）。</p>
+  <div class="callout warn"><b>不建议照搬：</b>Go 实现代码不可直接复用（规则集需移植重写）；它只做「发现 + 解释」，不做监控、事件、编排——是平台的一个模块，不是全部。</div>
+</section>
+
+<!-- ============ OneUptime ============ -->
+<section id="oneuptime">
+  <h2>3. OneUptime<span class="en">监控与事件管理底座 + AI 修复闭环</span></h2>
+  <div class="proj-head">
+    <div class="proj-dot" style="background: var(--oneuptime);"></div>
+    <p><b>定位：</b>开源一体化可观测性与事件管理平台，替代 Pingdom/PagerDuty/Datadog/Sentry/StatusPage 等 9 类工具，主打 "Agentic Observability"。</p>
+  </div>
+  <div class="proj-facts">
+    <span>Apache-2.0 + <code>ee/</code></span><span>TypeScript monorepo</span><span>~7.7k stars</span><span>支持完全离线自托管</span>
+  </div>
+  <p class="text-muted" style="color: var(--text-muted); font-size: 13.5px;">社区版含完整监控、事件、可观测性与 SAML/OIDC SSO；<code>ee/</code> 目录（SCIM、审计日志、合规仪表盘）为商业许可。</p>
+
+  <h3>3.1 真正提效的功能</h3>
+  <div class="tbl-wrap">
+  <table>
+    <thead><tr><th style="width:36px">#</th><th style="width:30%">功能</th><th>为什么提效</th><th style="width:26%">企业落地注意点</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td><b>多地域拨测 + 私有 Probe 架构</b>：Probe 纯出站 HTTPS（不开入站端口），可部署于内网/VPN/气隙环境；<code>Probe Agreement</code>（N 个 probe 结果一致才判定故障）防误报；probe 断连 3 分钟即告警</td><td>内网拨测 + 防误报共识机制，是「误报治理」的直接范本</td><td>内网地址默认拒绝（<code>PROBE_ALLOW_PRIVATE_NETWORK_MONITORS=true</code> 才放开），安全默认值设计值得借鉴</td></tr>
+      <tr><td>2</td><td><b>监控类型覆盖</b>：API/Ping/Port/DNS/<b>SSL 证书/域名到期</b>/关键词/合成监控（最低 10s）、心跳、SNMP；基础设施代理覆盖 K8s/Docker/VM</td><td>「低频但高危」的证书/域名检查一平台全覆盖，清单可直接抄</td><td>—</td></tr>
+      <tr><td>3</td><td><b>On-Call 与升级链</b>：轮换排班 + Out-of-Office、按严重度路由、超时未确认多级升级（如 0/5/15 分钟）、电话/SMS/Slack/Teams 一键 Ack/Escalate/Resolve、完整通知审计、自动解决超时</td><td>值班减负核心机制，路由/升级/审计三件套设计成熟</td><td>国内通知渠道（钉钉/企微）需自研对接</td></tr>
+      <tr><td>4</td><td><b>Incident 全生命周期 + 状态页联动</b>：Detect→Alert→Respond→Resolve，P1-P4 分级；状态变更自动同步状态页；维护窗口自动抑制告警并通知订阅者；postmortem 含根因/影响面/行动项</td><td>「对内处置 + 对外沟通」一体，避免两系统搬运</td><td>—</td></tr>
+      <tr><td>5</td><td><b>遥测一体化（ClickHouse）</b>：PG 管状态、ClickHouse 统一存日志/指标/trace/异常、Valkey 管队列；异常自动关联部署</td><td>避免「用 PG 存日志」的经典错误；异常-部署关联是排查利器</td><td>有独立存储运维成本，小规模可先不上</td></tr>
+      <tr><td>6</td><td><b>IaC 与自动化</b>：Terraform/REST API 管理 monitor 与 on-call 配置；无代码 Workflow（5000+ 集成）；Runbook（JS 步骤，沙箱执行）</td><td>监控配置进 Git，变更可审计</td><td>—</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>3.2 AI 运用亮点（该项目 AI 能力强，是差异化重点）</h3>
+  <div class="card">
+    <ul class="clean">
+      <li><b>AI 调查与 RCA</b>：新事件/告警自动触发调查，读取 traces/logs/metrics/exceptions/deploys，发布<b>带引用</b>的根因分析；人工确认后可转为 fix task。</li>
+      <li><b>修复 PR 全闭环（Fix PR）</b>：Runner 克隆仓库 → 建 <code>oneuptime-fix-*</code> 分支 → 代码 agent 改动并构建/测试 → 开 PR，<b>合并必须人工完成</b>；合并后持续 14 天验证异常是否复发 / p99 是否改善。从「检测 → 根因 → 修复 → 生产验证」的全闭环在开源项目中少见。</li>
+      <li><b>工程控制成熟</b>：每次任务限 40 次 LLM 调用 / 10 万输出 token；Runner 不持有 API key（由 server 统一调用并计量）；自动修复默认关闭；自托管可配置任意 provider（含本地 Ollama），代码不出企业内网；上下文脱敏、上限 10 项。</li>
+      <li>（未确认：未见「自然语言查询日志/指标」类 BI 式交互。）</li>
+    </ul>
+  </div>
+
+  <h3>3.3 架构与实践亮点</h3>
+  <div class="callout ok">
+    <b>「同镜像多角色」的模块化单体</b>而非严格微服务：App 各角色共用一个镜像，Compose 单容器可跑全部，Helm 可拆独立 Deployment——大幅降低部署复杂度，<b>非常值得自研平台借鉴</b>。存储职责分明：PG（状态）+ ClickHouse（遥测）+ Valkey（队列）。
+  </div>
+  <div class="callout warn"><b>借鉴价值有限处：</b>全栈 TypeScript monorepo，对 Python 团队代码复用性低——学架构与功能设计，不搬代码。</div>
+</section>
+
+<!-- ============ Keep ============ -->
+<section id="keep">
+  <h2>4. Keep<span class="en">告警接入、降噪与 AI 生成编排</span></h2>
+  <div class="proj-head">
+    <div class="proj-dot" style="background: var(--keep);"></div>
+    <p><b>定位：</b>开源 AIOps 告警管理平台，「GitHub Actions for your monitoring tools」，为告警、自动化、降噪提供单一全景视图。</p>
+  </div>
+  <div class="proj-facts">
+    <span>MIT + <code>ee/</code>（Open Core）</span><span>~12.4k stars</span><span><b>Python FastAPI + React/Next.js + PostgreSQL + Redis/Celery</b> ⭐ 与本平台同构</span><span>支持气隙部署</span>
+  </div>
+  <p style="color: var(--text-muted); font-size: 13.5px;">企业版边界：SSO/SAML/LDAP、RBAC/ABAC 属 <code>ee/</code> 商业许可。代码与设计模式可直接深挖。</p>
+
+  <h3>4.1 真正提效的功能</h3>
+  <div class="tbl-wrap">
+  <table>
+    <thead><tr><th style="width:36px">#</th><th style="width:30%">功能</th><th>为什么提效</th><th style="width:26%">企业落地注意点</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td><b>125+ provider 接入体系</b>：统一抽象「告警源/数据查询/动作输出」三类角色，一次接入全平台复用；双向（拉取告警 + 执行动作）</td><td>告警接入层直接蓝图；有 adding-a-new-provider 开发范式可抄</td><td>国内工具（阿里云监控、钉钉等）需自研 provider；凭据管理要配套</td></tr>
+      <tr><td>2</td><td><b>fingerprint 去重</b>：摄入管道内自动执行，每 provider 内置 <code>FINGERPRINT_FIELDS</code>，支持「部分合并 + 全同丢弃」两档</td><td>降噪第一道闸，机制清晰可直接借鉴</td><td>fingerprint 字段需按业务定制</td></tr>
+      <tr><td>3</td><td><b>规则化 correlation → incident</b>：按告警属性（severity/source/labels）AND/OR 归并成事件，动态命名，<b>候选事件人工确认</b>的灰度机制</td><td>告警风暴 → 少量事件的自动化路径</td><td>规则爆炸后需运营治理；保留候选审批模式</td></tr>
+      <tr><td>4</td><td><b>YAML workflow 引擎（核心资产）</b>：声明式 triggers（手动/定时/告警触发带过滤）/ steps / actions / conditions / foreach / 内置函数 / context 变量</td><td>实现「告警→查上下文→通知/工单→自动处置」闭环；<b>编排即代码</b>，可进 Git 做 IaC/CI-CD 审计</td><td>引擎自研工作量最大，可评估直接复用</td></tr>
+      <tr><td>5</td><td><b>告警富化管道</b>：mapping（CSV/拓扑按字段匹配）、extraction（从告警字段提取）、workflow 富化；摄入时点执行</td><td>「谁值班、什么影响面」等静态知识在告警到达时自动补全</td><td>拓扑/CSV 数据需维护</td></tr>
+      <tr><td>6</td><td><b>API-first</b>：UI 能做的 API 都能做</td><td>利于企业自建前端或集成自有系统</td><td>—</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>4.2 AI 运用亮点</h3>
+  <p>Keep 的 AI 分三层，覆盖「生成编排 / 编排中调用 / 运维问答」全链路：</p>
+  <div class="card">
+    <ol>
+      <li><b>AI Workflow Builder（自然语言 → 可执行编排）</b>：聊天式 UI，自然语言描述需求 → AI 生成/修改 workflow YAML，<b>人在回路（AI 只提议、用户明确同意后才应用）</b>。是「自然语言→可执行编排」模式的代表实现。</li>
+      <li><b>Workflow 内 AI 步骤</b>：AI 作为 provider 嵌入 steps/actions，用例包括输入归一化、路由分流、severity 判定、摘要生成；支持 OpenAI/Anthropic/DeepSeek/Gemini/Ollama/vLLM——<b>数据流向由用户定义</b>，仅显式接入时数据才外发，对数据不出域企业友好。</li>
+      <li><b>AI Incident Assistant</b>：事件页内嵌 Copilot，把 incident 全量上下文（告警列表、描述、受影响拓扑）一次性传给 LLM 做根因分析，并能<b>通过 provider methods 直接在第三方系统执行命令</b>（不只问答，可执行；开源版标注 experimental）。</li>
+    </ol>
+  </div>
+  <div class="callout ok"><b>差异化：</b>AI 不是独立功能而是贯穿全链路；且 AI 输出均落在<b>可审计的 YAML workflow</b> 上（生成物可读、可改、可进 Git），而非黑盒决策。（待确认：prompt 构造细节官方文档未披露，需读源码。）</div>
+
+  <h3>4.3 工程实践亮点</h3>
+  <p><b>Provider 抽象</b>：可扩展 Python 组件，入站（推/拉/手动三种模式）+ 出站；每 provider 带 <code>FINGERPRINT_FIELDS</code>；有 template 范式降低新 provider 开发成本。<b>告警处理流水线固定顺序</b>：摄入 → enrichment → deduplication，各环节职责单一。<b>可配置即代码</b>：告警规则、workflow、provider 均可 provision。</p>
+  <div class="callout warn"><b>注意：</b>前端是 Next.js 而非 Vite SPA；<code>ee/</code> 目录代码不得参考搬运。</div>
+</section>
+
+<!-- ============ AI 范式对比 ============ -->
+<section id="ai-patterns">
+  <h2>5. AI 应用模式横向对比<span class="en">方法论层</span></h2>
+  <p>四个项目代表了四种可复用的 AI 应用范式：</p>
+  <div class="paradigms">
+    <div class="paradigm">
+      <span class="tag">范式 A</span>
+      <h4>规则找问题、AI 解释问题</h4>
+      <p>确定性 analyzer 先产出结构化错误，LLM 只做「翻译」。</p>
+      <p class="who">k8sgpt</p>
+      <p>✅ 幻觉最小、成本最低、结果可复现；⚠️ 上限取决于规则覆盖。适用：集群体检、已知错误模式诊断。</p>
+    </div>
+    <div class="paradigm">
+      <span class="tag">范式 B</span>
+      <h4>Agent 循环自主调查</h4>
+      <p>LLM + 工具调用循环，自主取数、验证假设、出根因。</p>
+      <p class="who">HolmesGPT · OneUptime</p>
+      <p>✅ 能力上限高；⚠️ 需重护栏（只读/审批/输出治理/预算）。适用：未知的复杂故障、跨系统排障。</p>
+    </div>
+    <div class="paradigm">
+      <span class="tag">范式 C</span>
+      <h4>自然语言 → 可执行编排</h4>
+      <p>NL 生成 YAML workflow，人审核后应用，产物可进 Git。</p>
+      <p class="who">Keep</p>
+      <p>✅ 产物可审计可版本化；⚠️ 依赖 workflow 引擎底座。适用：自动化处置、巡检项生成。</p>
+    </div>
+    <div class="paradigm">
+      <span class="tag">范式 D</span>
+      <h4>AI 修复代码全闭环</h4>
+      <p>查根因 → 代码 agent 改码 → PR → 人工合并 → 生产验证 14 天。</p>
+      <p class="who">OneUptime</p>
+      <p>✅ 价值最高；⚠️ 投入与治理要求也最高。适用：有工程团队的故障修复。</p>
+    </div>
+  </div>
+
+  <h3>共同的安全护栏设计模式（比单个功能更值得抄）</h3>
+  <div class="tbl-wrap">
+  <table>
+    <thead><tr><th>护栏</th><th style="width:40%">出处</th></tr></thead>
+    <tbody>
+      <tr><td>发 AI 前强制脱敏、返回后本地还原</td><td>k8sgpt anonymization</td></tr>
+      <tr><td>默认只读，写操作显式 opt-in</td><td>HolmesGPT K8s toolset / Remediation MCP</td></tr>
+      <tr><td>LLM 永不持有写权限，由确定性层计算 patch + dry-run</td><td>k8sgpt auto-remediation</td></tr>
+      <tr><td>高危工具调用前人工审批</td><td>HolmesGPT tool approval</td></tr>
+      <tr><td>调用预算上限（次数 / token）</td><td>OneUptime（40 次 / 10 万 token 每任务）</td></tr>
+      <tr><td>Runner 不持有密钥，密钥由服务端统一管理计量</td><td>OneUptime</td></tr>
+      <tr><td>人在回路：AI 只提议，人确认后生效</td><td>Keep Workflow Builder / OneUptime Fix PR</td></tr>
+      <tr><td>全链路审计（prompt / 工具调用 / 答案）</td><td>HolmesGPT OTel 导出</td></tr>
+      <tr><td>支持本地模型（Ollama/vLLM），数据不出域</td><td>全部四个项目</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<!-- ============ 落地建议 ============ -->
+<section id="roadmap">
+  <h2>6. 对本平台（huntai-sre）的落地建议<span class="en">Roadmap</span></h2>
+  <p>结合本仓库技术栈（Python + FastAPI + uv；React + TS + Vite + Tailwind + shadcn/ui）与四个项目的成熟度，建议按<b>「先确定性、后 AI」</b>的顺序分五期演进。阶段划分为建议方案，优先级需结合团队资源确认 <code>[TBD-BIZ]</code>。</p>
+
+  <h3>6.1 功能路线图</h3>
+  <div class="tbl-wrap">
+  <table>
+    <thead><tr><th style="width:130px">阶段</th><th>能力</th><th style="width:26%">借鉴来源</th><th style="width:24%">说明</th></tr></thead>
+    <tbody>
+      <tr><td rowspan="4" class="phase-label">P0 确定性底座</td><td>多集群接入（只读 kubeconfig + 平台 RBAC）</td><td>HolmesGPT 只读基线</td><td>一切的前提</td></tr>
+      <tr><td>集群体检引擎（K8s 错误模式规则库）</td><td>k8sgpt analyzer 规则集（移植为 Python）</td><td>确定性诊断，输出结构化 finding</td></tr>
+      <tr><td>告警接入层（provider 抽象：告警源/查询/动作三类角色）</td><td>Keep provider 范式</td><td>同栈代码可直接参考</td></tr>
+      <tr><td>告警去重（fingerprint 机制 + 摄入管道）</td><td>Keep deduplication</td><td>降噪第一道闸</td></tr>
+      <tr><td rowspan="4" class="phase-label">P1 AI 解释层<br><small style="color:var(--text-muted);font-weight:400">性价比最高的 AI 切入点</small></td><td>AI 诊断解释 + 修复建议（范式 A）</td><td>k8sgpt</td><td>规则找问题、AI 解释；只发错误片段</td></tr>
+      <tr><td>发 AI 前脱敏 + 返回还原</td><td>k8sgpt anonymization</td><td>合规刚需</td></tr>
+      <tr><td>多模型抽象（LiteLLM 一类方案，支持本地 Ollama/vLLM）</td><td>k8sgpt AI backends / Keep</td><td>避免锁定、数据不出域</td></tr>
+      <tr><td>诊断摘要推送 IM（钉钉/企微）</td><td>Keep provider 出站动作</td><td>渠道 <code>[TBD-BIZ]</code></td></tr>
+      <tr><td rowspan="4" class="phase-label">P2 事件与响应</td><td>On-call 排班 + 升级链 + 通知审计</td><td>OneUptime</td><td>值班减负核心</td></tr>
+      <tr><td>Incident 生命周期 + postmortem + 状态页联动</td><td>OneUptime</td><td>对内处置 + 对外沟通一体</td></tr>
+      <tr><td>告警关联规则（候选事件人工确认制）</td><td>Keep correlation</td><td>降噪第二道闸</td></tr>
+      <tr><td>拨测 + 私有 Probe（出站-only + 多 probe 共识）</td><td>OneUptime Probe</td><td>内网监控 + 防误报</td></tr>
+      <tr><td rowspan="5" class="phase-label">P3 Agent 调查与编排</td><td>YAML toolset / HTTP connector 机制</td><td>HolmesGPT</td><td>内部系统零代码接入 AI</td></tr>
+      <tr><td>Agent 告警自动调查（范式 B）+ 工具审批</td><td>HolmesGPT、OneUptime</td><td>带引用的 RCA</td></tr>
+      <tr><td>Workflow 引擎（YAML 声明式编排）</td><td>Keep</td><td>处置闭环，可进 Git</td></tr>
+      <tr><td>AI Workflow Builder（范式 C：NL→YAML 人审核）</td><td>Keep</td><td>产物可审计</td></tr>
+      <tr><td>定时巡检 / 部署验证（自然语言巡检项）</td><td>HolmesGPT HealthCheck CRD</td><td>注意 LLM 成本分级</td></tr>
+      <tr><td rowspan="2" class="phase-label">P4 远期</td><td>AI 修复 PR 闭环（范式 D）</td><td>OneUptime Fix PR</td><td>人工合并 + 合并后验证</td></tr>
+      <tr><td>窄路径自动处置</td><td>k8sgpt auto-remediation</td><td>LLM 无写权限，确定性层算 patch + dry-run</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>6.2 架构借鉴要点</h3>
+  <div class="card">
+    <ol>
+      <li><b>模块化单体起步</b>（OneUptime「同镜像多角色」）：不要一开始就微服务；probe/runner 等边缘组件独立部署。</li>
+      <li><b>存储分层</b>：PG 管业务状态；遥测（日志/指标/trace）规模上来后上 ClickHouse；Redis/Celery 类队列管异步任务。小规模可先 PG + Redis 起步 <code>[TBD-INFRA]</code>。</li>
+      <li><b>CLI / 服务端 / 定时任务三形态共享同一内核</b>（HolmesGPT）：诊断能力既能被人手动调用，也能被巡检调度。</li>
+      <li><b>API-first + 配置即代码</b>（Keep、OneUptime）：UI 全功能有 API；provider/workflow/巡检规则全部可进 Git。</li>
+      <li><b>复用现有可观测栈</b>：若已有 Prometheus/Grafana/Loki，优先做 toolset/connector 集成而非自建存储 <code>[TBD-INFRA]</code>。</li>
+      <li><b>气隙与本地模型</b>为第一优先约束设计（全部四项目的共同经验）。</li>
+    </ol>
+  </div>
+
+  <h3>6.3 参考方式三档</h3>
+  <div class="tbl-wrap">
+  <table>
+    <thead><tr><th style="width:130px">档位</th><th>内容</th></tr></thead>
+    <tbody>
+      <tr><td><b>直接复用/移植</b></td><td>Keep 的 provider 抽象与去重流水线设计（同栈）；k8sgpt analyzer 规则集与脱敏算法（移植为 Python）；HolmesGPT toolset YAML schema 设计</td></tr>
+      <tr><td><b>改造借鉴</b></td><td>Keep workflow 引擎语义（它是 Celery/ARQ 实现）；OneUptime on-call/incident 数据模型</td></tr>
+      <tr><td><b>只学思想</b></td><td>OneUptime TS 代码与微服务拆分；k8sgpt Go 代码；各项目 <code>ee/</code> 目录（License 限制，禁止参考搬运）</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>6.4 风险与合规注意</h3>
+  <div class="callout warn">
+    <ul class="clean">
+      <li><b>License 边界</b>：Keep <code>ee/</code>（SSO/RBAC/ABAC）与 OneUptime <code>ee/</code>（SCIM/审计日志）为商业许可，代码不可复制；Apache-2.0 / MIT 部分可合规借鉴（保留版权声明）。</li>
+      <li><b>LLM 成本治理</b>：巡检频率、模型分级（巡检用小模型、事故调查用强模型）、调用预算上限——三者都要在平台层内置，不要留给用户自觉。</li>
+      <li><b>K8s 版本兼容</b>：analyzer 规则集需随集群版本维护，纳入平台自身的 CI。</li>
+      <li><b>AI 安全默认值</b>：只读默认、写操作 opt-in、脱敏默认开启、自动修复默认关闭。</li>
+    </ul>
+  </div>
+
+  <h3>6.5 待确认事项</h3>
+  <div class="tbl-wrap">
+  <table>
+    <thead><tr><th style="width:110px">标记</th><th>事项</th><th style="width:32%">确认方 / 阶段</th></tr></thead>
+    <tbody>
+      <tr><td><code>[TBD-BIZ]</code></td><td>平台目标用户规模与监控对象规模（决定是否需要 ClickHouse 级遥测存储）</td><td>业务负责人 · 立项阶段</td></tr>
+      <tr><td><code>[TBD-BIZ]</code></td><td>数据是否允许出域、可用哪些模型（决定 AI backend 选型与脱敏强度）</td><td>安全/合规负责人</td></tr>
+      <tr><td><code>[TBD-INFRA]</code></td><td>是否已有 Prometheus/Grafana/Loki/ELK 等可复用栈</td><td>基础设施负责人</td></tr>
+      <tr><td><code>[TBD-BIZ]</code></td><td>on-call 通知渠道（钉钉/企微/Slack）与排班制度</td><td>业务负责人</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<!-- ============ 参考资料 ============ -->
+<section id="refs">
+  <h2>7. 参考资料<span class="en">References</span></h2>
+  <h3>HolmesGPT</h3>
+  <ul class="refs">
+    <li>GitHub：<a href="https://github.com/HolmesGPT/holmesgpt">https://github.com/HolmesGPT/holmesgpt</a></li>
+    <li>文档站：<a href="https://holmesgpt.dev/latest/">https://holmesgpt.dev/latest/</a> ｜ Why HolmesGPT：<a href="https://holmesgpt.dev/latest/why-holmesgpt/">why-holmesgpt</a></li>
+    <li>内置 Toolsets：<a href="https://holmesgpt.dev/latest/data-sources/builtin-toolsets/">builtin-toolsets</a> ｜ 自定义：<a href="https://holmesgpt.dev/latest/data-sources/custom-toolsets/">custom-toolsets</a> ｜ 工具执行安全：<a href="https://holmesgpt.dev/latest/data-sources/tool-execution-safety/">tool-execution-safety</a></li>
+    <li>HTTP API：<a href="https://holmesgpt.dev/latest/reference/http-api/">http-api</a> ｜ Operator 健康检查：<a href="https://holmesgpt.dev/latest/operator/health-checks/">health-checks</a> ｜ CNCF：<a href="https://www.cncf.io/projects/holmesgpt">cncf.io/projects/holmesgpt</a></li>
+  </ul>
+  <h3>k8sgpt</h3>
+  <ul class="refs">
+    <li>GitHub：<a href="https://github.com/k8sgpt-ai/k8sgpt">https://github.com/k8sgpt-ai/k8sgpt</a> ｜ Operator：<a href="https://github.com/k8sgpt-ai/k8sgpt-operator">k8sgpt-operator</a></li>
+    <li>自动修复：<a href="https://github.com/k8sgpt-ai/k8sgpt-operator/blob/main/AUTO_REMEDIATION.md">AUTO_REMEDIATION.md</a> ｜ CNCF：<a href="https://www.cncf.io/projects/k8sgpt">cncf.io/projects/k8sgpt</a></li>
+    <li>官方文档：<a href="https://docs.k8sgpt.ai">https://docs.k8sgpt.ai</a>（analyzers / ai-backends / privacy / filters）</li>
+  </ul>
+  <h3>OneUptime</h3>
+  <ul class="refs">
+    <li>GitHub：<a href="https://github.com/OneUptime/OneUptime">https://github.com/OneUptime/OneUptime</a> ｜ 官网：<a href="https://oneuptime.com">https://oneuptime.com</a></li>
+    <li>AI Agent：<a href="https://oneuptime.com/docs/ai/ai-agent">docs/ai/ai-agent</a> ｜ Custom Probe：<a href="https://oneuptime.com/docs/en/probe/custom-probe">probe/custom-probe</a> ｜ 自托管架构：<a href="https://oneuptime.com/docs/en/self-hosted/architecture">self-hosted/architecture</a></li>
+    <li>On-Call：<a href="https://oneuptime.com/product/on-call">product/on-call</a> ｜ Incident：<a href="https://oneuptime.com/product/incident-management">product/incident-management</a> ｜ 状态页：<a href="https://oneuptime.com/product/status-page">product/status-page</a></li>
+  </ul>
+  <h3>Keep</h3>
+  <ul class="refs">
+    <li>GitHub：<a href="https://github.com/keephq/keep">https://github.com/keephq/keep</a> ｜ 文档：<a href="https://docs.keephq.dev">https://docs.keephq.dev</a></li>
+    <li>Workflow：<a href="https://docs.keephq.dev/workflows/overview">workflows/overview</a> ｜ 去重：<a href="https://docs.keephq.dev/overview/deduplication">deduplication</a> ｜ 关联规则：<a href="https://docs.keephq.dev/overview/correlation-rules">correlation-rules</a> ｜ 富化：<a href="https://docs.keephq.dev/overview/enrichment/mapping">enrichment/mapping</a></li>
+    <li>AI Workflow Assistant：<a href="https://docs.keephq.dev/overview/ai-workflow-assistant">ai-workflow-assistant</a> ｜ AI in Workflows：<a href="https://docs.keephq.dev/overview/ai-in-workflows">ai-in-workflows</a> ｜ AI Incident Assistant：<a href="https://docs.keephq.dev/overview/ai-incident-assistant">ai-incident-assistant</a></li>
+  </ul>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    企业 SRE 运维平台开源对标分析报告 · 2026-10-24 · 生成于 huntai-sre 项目调研 · 所有结论基于公开一手资料，未验证项已标注。
+  </div>
+</footer>
+
+</body>
+</html>
