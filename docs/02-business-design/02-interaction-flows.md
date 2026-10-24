@@ -2,7 +2,7 @@
 
 | 元信息 | |
 |---|---|
-| 状态 | draft（待评审） |
+| 状态 | accepted |
 | 日期 | 2026-10-24 |
 | 依据 | `01-research/01-benchmark-report.md`（AI 范式与护栏）、`01-domain-model.md`（实体与 BR 规则） |
 | 读者 | 产品、SRE、后端/前端研发 |

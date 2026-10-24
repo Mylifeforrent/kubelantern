@@ -1,0 +1,4948 @@
+# =============================================================================
+# huntai-sre API — OpenAPI 3.1 契约草案（阶段一手写临时事实源）
+# 治理依据：docs/03-tech-design/05-fe-be-boundary.md §2（两阶段契约流程）
+# 枚举/字段唯一事实源：docs/03-tech-design/01-data-model.md §2/§3
+# 阶段二切换后本文件退役归档至 docs/04-api/archive/，禁止复活（05-fe-be-boundary §2.2）
+# =============================================================================
+openapi: 3.1.0
+info:
+  title: huntai-sre API
+  version: 0.1.0
+  summary: huntai-sre（基于 Kubernetes 的企业内部 SRE 运维平台）API 契约草案
+  license:
+    name: Proprietary（企业内部系统，未对外授权）
+    identifier: LicenseRef-Proprietary
+  description: |
+    ## 定位与治理
+
+    本文件是 huntai-sre 平台 API 的**阶段一手写契约草案**（仓库尚无后端代码时期的临时单一事实源），
+    治理依据 `docs/03-tech-design/05-fe-be-boundary.md` §2：
+
+    - 阶段一（当前）：本文件为临时契约源；前端据此生成类型与 mock 开发，后端按草案实现路由与 DTO，
+      实现偏差回修草案（独立 PR，spec diff 为审查面）。
+    - 阶段二（切换后，永久）：事实源切换为 FastAPI 导出的 `docs/04-api/openapi.json`，
+      CI 以 `git diff --exit-code` 强制同步（`04-backend-design.md` §4.5）；本草案一次性退役归档。
+
+    ## 契约对齐基线（05-fe-be-boundary §2.2「草案必须对齐的三件事」）
+
+    1. 错误结构：RFC 7807 `application/problem+json`（本文件 `Problem` schema）。
+    2. 分页：查询参数 `offset`/`limit`（limit 上限 200、offset 上限 10000），
+       响应平铺 `{items, total, offset, limit}`（`PageMeta`）。
+    3. 枚举值域：逐条复制 `03-tech-design/01-data-model.md` §3 枚举字典，禁止自创值。
+
+    ## 通用约定
+
+    - JSON 字段命名一律 snake_case（05-fe-be-boundary §2.4）；时间一律 UTC ISO 8601（`date-time`，带 `Z` 后缀）。
+    - 认证占位 `bearerAuth`：认证方式（SSO/LDAP/本地）`[TBD-INFRA]`（基础设施负责人 / P0 部署设计）；
+      webhook 机器入口与 `/auth/token` 不走 bearer（security 为空）。
+    - 每个操作标注 `x-phase`（P0/P1/P2/P3 分期）与 `x-roles`（所需角色，取自领域文档 §3 权限矩阵；
+      `(T)` 后缀 = 限本团队，由后端行级过滤实现，前端不做安全边界）。
+
+    ## 与既有文档的冲突登记（[CONFLICT]，待评审裁决，裁决前不引入第三方案）
+
+    - [CONFLICT-C1] webhook 接入路径：本草案 `POST /alerts/webhook/{provider_key}`（按契约任务指定）
+      vs `04-backend-design.md` §4.1/§3.2.1 的 `POST /webhooks/{provider_name}`。裁决证据：redocly lint
+      报告本草案路径与 `/alerts/{id}/ack` 等存在路由歧义（如 URL `/alerts/webhook/ack` 双匹配），既有方案无此问题。
+    - [CONFLICT-C2] 告警/发现「认领」动作命名：本草案 `POST /alerts/{id}/ack`、`POST /findings/{id}/ack`
+      （按契约任务指定）vs `04-backend-design.md` §4.1 示例 `POST /alerts/{id}/acknowledge`。
+    - [CONFLICT-C3] AI 任务资源路径：本草案 `/ai/tasks`（按契约任务指定）
+      vs `04-backend-design.md` §4.1 的 `/ai-tasks`。
+    - [CONFLICT-C4] 实时流路径：本草案 `GET /realtime/stream`（按契约任务指定）
+      vs `04-backend-design.md` §5.1 的 `GET /stream`。
+
+    ## 开放事项（节选，全集见 docs/04-api/README.md）
+
+    - SSE 通道选型最终确认 `[TBD-FE]`（ADR-0006）；事件类型命名为草案定义（命名权归 04-api，
+      05-fe-be-boundary §1 实时推送行）。
+    - 状态页可见性默认值、升级链各级超时与渠道组合 `[TBD-BIZ]`（业务负责人 / P2 设计前）。
+servers:
+  - url: /api/v1
+    description: 同源部署相对路径；前端 dev 经 Vite proxy 指向 api 进程或 mock server（05-fe-be-boundary §3.1 S4）。
+security:
+  - bearerAuth: []
+tags:
+  - name: auth
+    description: 认证与用户、角色（P0，admin）
+  - name: clusters
+    description: 集群接入与连接健康（P0，admin）
+  - name: providers
+    description: 告警源提供方（P0，admin）
+  - name: alert-ingestion
+    description: 告警 webhook 机器入口（P0，Provider 令牌，非用户认证）
+  - name: alerts
+    description: 告警工作台（P0 列表/详情/认领/关闭；P1 解释；P2 转事件）
+  - name: alert-rules
+    description: 富化规则（P0）、关联规则（P2）、维护窗口（P2）
+  - name: incident-candidates
+    description: 候选事件确认队列（P2，BR-04）
+  - name: incidents
+    description: 事件生命周期、状态页联动、AI 调查、复盘（P2/P3）
+  - name: status-page
+    description: 状态页条目（P2，BR-06）
+  - name: inspections
+    description: 巡检规则、策略、执行（P0）
+  - name: findings
+    description: 巡检发现与处置（P0；P1 AI 解释 BR-09）
+  - name: ai-tasks
+    description: AI 任务中心：审批、取消、调用审计（P1，BR-02/03/05/10）
+  - name: oncall
+    description: 排班表与升级策略（P2）
+  - name: notifications
+    description: 通知记录审计查询（P2，BR-08）
+  - name: workflows
+    description: Workflow 编排（P3 概要级，BR-05）
+  - name: realtime
+    description: SSE 实时推送（P0 起，[TBD-FE] 通道最终确认 ADR-0006）
+  - name: audit
+    description: 审计日志（P0，admin，只读不可删改 BR-10）
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        占位方案。认证方式（SSO/LDAP/本地）`[TBD-INFRA]`（基础设施负责人 / P0 部署设计，
+        沿 04-backend-design §8 / 01-data-model §9）；确定后本 securityScheme 与 /auth/token 端点随之修订。
+  parameters:
+    OffsetParam:
+      name: offset
+      in: query
+      required: false
+      description: 分页偏移；上限 10000 防深分页（04-backend-design §4.3 [ASSUMPTION]，P0 压测校准）。
+      schema:
+        type: integer
+        minimum: 0
+        maximum: 10000
+        default: 0
+    LimitParam:
+      name: limit
+      in: query
+      required: false
+      description: 每页条数；上限 200（04-backend-design §4.3）。
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 200
+        default: 50
+    IdParam:
+      name: id
+      in: path
+      required: true
+      description: 资源主键（bigint 代理键，01-data-model §2.1）。
+      schema:
+        type: integer
+        format: int64
+  responses:
+    BadRequest:
+      description: 参数/过滤字段非法（04-backend-design §4.4）。
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Unauthorized:
+      description: 未认证。
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Forbidden:
+      description: 权限矩阵拒绝（领域文档 §3）。
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    NotFound:
+      description: 资源不存在；团队隔离下的越权访问一律 404 防资源探测（04-backend-design §4.4）。
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Conflict:
+      description: 状态机非法迁移或唯一约束冲突（如 cancelled 缺原因、已 resolved 再认领，04-backend-design §4.4）。
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    TooManyRequests:
+      description: webhook 限流（04-backend-design §3.2.3：超限请求仍落盘，等价于标记 pending，返回 429）。
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    InternalError:
+      description: 内部错误（detail 不泄内部信息，04-backend-design §4.4）。
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+  schemas:
+    # ---------- 通用 ----------
+    Problem:
+      type: object
+      description: |
+        RFC 7807 错误响应（04-backend-design §4.4）。`type` URL 域名占位，随部署域名定 `[TBD-INFRA]`。
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+          format: uri
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+          description: 面向开发者的诊断信息，不是 UI 文案（05-fe-be-boundary §6 AP-2）。
+        instance:
+          type: string
+        code:
+          type: string
+          description: 平台错误码扩展成员（如 ALERT_STATE_CONFLICT）；错误码清单位 [ASSUMPTION]（04-api 定稿时随清单一并固化）。
+        trace_id:
+          type: string
+          description: 请求级追踪 id，与结构化日志关联（04-backend-design §6.1）。
+    PageMeta:
+      type: object
+      description: 分页 envelope 元数据；与 items 平铺在同一响应对象（04-backend-design §4.3：`{items, total, offset, limit}`）。
+      required: [total, offset, limit]
+      properties:
+        total:
+          type: integer
+          minimum: 0
+        offset:
+          type: integer
+          minimum: 0
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 200
+    # ---------- 认证与用户（01-data-model §2.2） ----------
+    RoleCode:
+      type: string
+      description: 角色标识（领域文档 §3：admin / sre / oncall_manager / developer / viewer）。
+      enum: [admin, sre, oncall_manager, developer, viewer]
+    AuthTokenRequest:
+      type: object
+      description: 登录请求占位。认证方式（SSO/LDAP/本地）`[TBD-INFRA]`（基础设施负责人 / P0 部署设计），请求体形态随认证结论修订。
+      required: [username, password]
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+          format: password
+    AuthTokenResponse:
+      type: object
+      description: 令牌响应占位 `[TBD-INFRA]`（同 AuthTokenRequest）。
+      required: [access_token, token_type]
+      properties:
+        access_token:
+          type: string
+        token_type:
+          type: string
+          enum: [bearer]
+        expires_in:
+          type: integer
+          description: 有效期（秒）。
+    User:
+      type: object
+      description: 用户（01-data-model §2.2 users）。不含密码/凭据字段。
+      required: [id, username, email, display_name, is_active, created_at, updated_at]
+      properties:
+        id:
+          type: integer
+          format: int64
+        username:
+          type: string
+        email:
+          type: string
+          format: email
+        display_name:
+          type: string
+        team:
+          type: string
+          description: 所属团队；团队数据源（CMDB 对接 or 自维护）`[TBD-BIZ]`（业务负责人 / P0 设计前）。
+        roles:
+          type: array
+          description: 授予的角色列表（user_roles）[ASSUMPTION]（结构随 P0 权限模块详设固化）。
+          items:
+            $ref: '#/components/schemas/UserRoleGrant'
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    UserRoleGrant:
+      type: object
+      description: 用户-角色授予（01-data-model §2.2 user_roles）。
+      required: [role_code]
+      properties:
+        role_code:
+          $ref: '#/components/schemas/RoleCode'
+        team_scope:
+          type: string
+          description: developer 角色「限本团队」的授权范围（权限矩阵 T 列）；其他角色为 NULL [ASSUMPTION]。
+    UserCreate:
+      type: object
+      description: 创建用户。不含密码字段（认证方式 `[TBD-INFRA]`）。
+      required: [username, email, display_name]
+      properties:
+        username:
+          type: string
+        email:
+          type: string
+          format: email
+        display_name:
+          type: string
+        team:
+          type: string
+        roles:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserRoleGrant'
+    UserUpdate:
+      type: object
+      description: 更新用户（部分字段；状态化停用用 is_active=false，D-7）。
+      minProperties: 1
+      properties:
+        display_name:
+          type: string
+        team:
+          type: string
+        roles:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserRoleGrant'
+        is_active:
+          type: boolean
+    Role:
+      type: object
+      description: 角色（01-data-model §2.2 roles）；permissions 为领域 §3 权限矩阵的 JSON 落库 [ASSUMPTION]（结构见 04-backend-design §4.2 示例）。
+      required: [id, code, name, permissions, created_at, updated_at]
+      properties:
+        id:
+          type: integer
+          format: int64
+        code:
+          $ref: '#/components/schemas/RoleCode'
+        name:
+          type: string
+        permissions:
+          type: object
+          additionalProperties: true
+          description: 资源 × 动作权限矩阵（Y/N/T），结构 [ASSUMPTION]（P0 权限模块详设评审）。
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    # ---------- 集群与接入（01-data-model §2.3） ----------
+    Cluster:
+      type: object
+      description: 集群（01-data-model §2.3 clusters）。凭证只暴露 credential_id 引用，secret_ref 不经集群资源透出（D-2）。
+      required: [id, name, environment, api_endpoint, status, credential_id, created_at, updated_at]
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        environment:
+          type: string
+          description: 环境标识（dev/staging/prod 等开放值，不做枚举）。
+        api_endpoint:
+          type: string
+          format: uri
+        status:
+          $ref: '#/components/schemas/ClusterStatus'
+        k8s_version:
+          type: string
+          description: 最近探测到的版本。
+        credential_id:
+          type: integer
+          format: int64
+          description: 只读凭证引用（credentials.id；默认 readonly，BR-02）。
+        last_checked_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    ClusterStatus:
+      type: string
+      description: 集群连接健康状态（01-data-model §3 cluster_status；值域 [ASSUMPTION]，P0 接入域详设验证）。
+      enum: [connected, degraded, disconnected, unknown]
+    ClusterCreate:
+      type: object
+      description: 创建集群。凭证引用需先在密钥管理建立（credentials 资源端点未在本草案覆盖，[TBD-INFRA] P0 工程化时定是否补充，见 04-api/README.md 开放问题）。
+      required: [name, environment, api_endpoint, credential_id]
+      properties:
+        name:
+          type: string
+        environment:
+          type: string
+        api_endpoint:
+          type: string
+          format: uri
+        credential_id:
+          type: integer
+          format: int64
+    ClusterUpdate:
+      type: object
+      description: 更新集群。
+      minProperties: 1
+      properties:
+        name:
+          type: string
+        environment:
+          type: string
+        api_endpoint:
+          type: string
+          format: uri
+        credential_id:
+          type: integer
+          format: int64
+    ConnectionTestResult:
+      type: object
+      description: 连接测试结果；status/k8s_version 回写 clusters [ASSUMPTION]（结构随 P0 接入域详设微调）。
+      required: [status, checked_at]
+      properties:
+        status:
+          $ref: '#/components/schemas/ClusterStatus'
+        k8s_version:
+          type: string
+        message:
+          type: string
+        checked_at:
+          type: string
+          format: date-time
+    # ---------- Provider（01-data-model §2.4 providers） ----------
+    Provider:
+      type: object
+      description: |
+        告警源提供方（01-data-model §2.4 providers）。config 为非敏感配置，严禁写入任何密钥值
+        （领域文档 §8 凭据安全红线；providers.config 禁止写入密钥值，D-2）。
+      required: [id, name, type, category, config, fingerprint_fields, enabled, created_at, updated_at]
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        type:
+          type: string
+          description: 类型标识（如 alertmanager、prometheus、dingtalk-action），开放集合。
+        category:
+          $ref: '#/components/schemas/ProviderCategory'
+        pull_mode:
+          $ref: '#/components/schemas/ProviderPullMode'
+        config:
+          type: object
+          additionalProperties: true
+          description: 非敏感配置（endpoint、过滤条件等）。
+        credential_id:
+          type: integer
+          format: int64
+          description: Provider 凭据引用（可空）。
+        fingerprint_fields:
+          type: array
+          items:
+            type: string
+          description: 参与指纹计算的字段清单。
+        enabled:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    ProviderCategory:
+      type: string
+      description: Provider 三类角色（01-data-model §3 provider_category）。
+      enum: [source, query, action]
+    ProviderPullMode:
+      type: string
+      description: 拉取模式（01-data-model §3 provider_pull_mode；仅 category=source 有意义 [ASSUMPTION]）。
+      enum: [push, poll]
+    ProviderCreate:
+      type: object
+      required: [name, type, category]
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+        category:
+          $ref: '#/components/schemas/ProviderCategory'
+        pull_mode:
+          $ref: '#/components/schemas/ProviderPullMode'
+        config:
+          type: object
+          additionalProperties: true
+        credential_id:
+          type: integer
+          format: int64
+        fingerprint_fields:
+          type: array
+          items:
+            type: string
+        enabled:
+          type: boolean
+          default: true
+    ProviderUpdate:
+      type: object
+      minProperties: 1
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+        category:
+          $ref: '#/components/schemas/ProviderCategory'
+        pull_mode:
+          $ref: '#/components/schemas/ProviderPullMode'
+        config:
+          type: object
+          additionalProperties: true
+        credential_id:
+          type: integer
+          format: int64
+        fingerprint_fields:
+          type: array
+          items:
+            type: string
+        enabled:
+          type: boolean
+    WebhookIngestResult:
+      type: object
+      description: webhook 接入应答（04-backend-design §3.2.1 第 5 步：先落盘再入队，落盘即返 202；body {alert_id, merged}）。
+      required: [alert_id, merged]
+      properties:
+        alert_id:
+          type: integer
+          format: int64
+        merged:
+          type: boolean
+          description: true = 命中活跃 fingerprint 合并计数（不产生新行）；false = 新告警已落库。
+    # ---------- 告警（01-data-model §2.4 alerts） ----------
+    Alert:
+      type: object
+      description: |
+        告警列表项（01-data-model §2.4 alerts）。列表省略 raw_payload 以减载 [ASSUMPTION]
+        （验证方式：P0 告警工作台性能评审）；occurrence_count 为同 fingerprint 合并计数（L1 去重）。
+      required: [id, fingerprint, provider_id, severity, status, occurrence_count, first_occurred_at, last_occurred_at, created_at, updated_at]
+      properties:
+        id:
+          type: integer
+          format: int64
+        fingerprint:
+          type: string
+          description: 去重主维度（业务键）；活跃周期内唯一（D-1 部分唯一索引）。
+        provider_id:
+          type: integer
+          format: int64
+        title:
+          type: string
+          description: 列表展示标题，从 payload 归一化提取 [ASSUMPTION]（P0 前端信息架构评审）。
+        severity:
+          $ref: '#/components/schemas/AlertSeverity'
+        status:
+          $ref: '#/components/schemas/AlertStatus'
+        labels:
+          type: object
+          additionalProperties: true
+          description: 归一化标签（原始标签）。
+        enrichments:
+          type: object
+          additionalProperties: true
+          description: 富化管道附加字段（team/影响面/oncall 组等），与原始 labels 分离（降噪归因展示依据）。
+        occurrence_count:
+          type: integer
+          description: 同 fingerprint 合并计数。
+        first_occurred_at:
+          type: string
+          format: date-time
+        last_occurred_at:
+          type: string
+          format: date-time
+        assignee_id:
+          type: integer
+          format: int64
+        acknowledged_at:
+          type: string
+          format: date-time
+        resolved_at:
+          type: string
+          format: date-time
+        suppressed_by_window_id:
+          type: integer
+          format: int64
+          description: 被哪个维护窗口抑制（BR-07；status=suppressed 时非空）。
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    AlertDetail:
+      allOf:
+        - $ref: '#/components/schemas/Alert'
+        - type: object
+          description: |
+            告警详情（侧栏）：含原始 payload 快照与降噪归因支撑字段。降噪归因（为何合并/为何升级）的展示方式
+            `[TBD-UX]`（UX / P0 前端设计前）；归因数据由 status/occurrence_count/enrichments/
+            suppressed_by_window_id 派生 [ASSUMPTION]（P0 告警域详设评审）。
+          required: [raw_payload]
+          properties:
+            raw_payload:
+              type: object
+              additionalProperties: true
+              description: 原始上报内容快照（保留期 [TBD-BIZ]；凭据类内容禁止出现在响应 DTO，05-fe-be-boundary §2.4）。
+    AlertSeverity:
+      type: string
+      description: 告警归一化严重度（01-data-model §3 alert_severity；值域 [ASSUMPTION]，BR-09「warn 以上」= warning/critical）。
+      enum: [info, warning, critical]
+    AlertStatus:
+      type: string
+      description: 告警状态机（01-data-model §3 alert_status，领域 §6 Alert 8 态，值域禁止增删改）。
+      enum: [received, deduplicated, enriched, correlated, standalone, suppressed, notified, resolved]
+    # ---------- AI 解释（01-data-model §2.7 ai_explanations） ----------
+    AIExplanation:
+      type: object
+      description: |
+        AI 解释（范式 A 产物，01-data-model §2.7 ai_explanations）。
+        注意：存储层 ai_explanations 仅以 finding_id 关联；本端点（GET /alerts/{id}/explanations）的
+        告警级解释映射（经 converted finding 回链或告警上下文任务）为 [ASSUMPTION]
+        （验证方式：P1 AI 域详设评审，确认后回流 01-data-model）。
+      required: [id, finding_id, sanitized_input_digest, output, model, tokens, created_at]
+      properties:
+        id:
+          type: integer
+          format: int64
+        finding_id:
+          type: integer
+          format: int64
+        task_id:
+          type: integer
+          format: int64
+        sanitized_input_digest:
+          type: string
+          description: 脱敏输入摘要（sha-256），可复现性校验（BR-01）。
+        output:
+          type: object
+          additionalProperties: true
+          description: 结构化诊断 + 修复建议（A1）。
+        model:
+          type: string
+          description: 模型标识（本地优先，BR-12）。
+        tokens:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+    # ---------- 富化规则（01-data-model §2.4 enrichment_rules） ----------
+    EnrichmentRule:
+      type: object
+      description: 富化规则（01-data-model §2.4 enrichment_rules）。
+      required: [id, name, matchers, mappings, priority, enabled, created_at, updated_at]
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        matchers:
+          type: object
+          additionalProperties: true
+          description: 匹配条件（对 labels 的谓词，jsonb）。
+        mappings:
+          type: array
+          items:
+            $ref: '#/components/schemas/EnrichmentMapping'
+        priority:
+          type: integer
+          description: 多条命中时的应用顺序 [ASSUMPTION]（P0 富化引擎详设）。
+        enabled:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    EnrichmentMapping:
+      type: object
+      description: 富化动作（实体字典 §5.1 extraction/mapping 两类；01-data-model §2.4 mappings）。
+      required: [type, source, target]
+      properties:
+        type:
+          type: string
+          enum: [extraction, mapping]
+        source:
+          type: string
+        target:
+          type: string
+    EnrichmentRuleCreate:
+      type: object
+      required: [name, matchers, mappings]
+      properties:
+        name:
+          type: string
+        matchers:
+          type: object
+          additionalProperties: true
+        mappings:
+          type: array
+          items:
+            $ref: '#/components/schemas/EnrichmentMapping'
+        priority:
+          type: integer
+          default: 0
+        enabled:
+          type: boolean
+          default: true
+    EnrichmentRuleUpdate:
+      type: object
+      minProperties: 1
+      properties:
+        name:
+          type: string
+        matchers:
+          type: object
+          additionalProperties: true
+        mappings:
+          type: array
+          items:
+            $ref: '#/components/schemas/EnrichmentMapping'
+        priority:
+          type: integer
+        enabled:
+          type: boolean
+    # ---------- 关联规则（01-data-model §2.4 correlation_rules，P2） ----------
+    CorrelationRule:
+      type: object
+      description: 关联规则（01-data-model §2.4 correlation_rules）。candidate 模式必须人工确认（BR-04）；auto 准入门槛见 BR-04 [TBD-BIZ]。
+      required: [id, name, conditions, time_window_seconds, mode, confirm_count, reject_count, enabled, created_at, updated_at]
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        conditions:
+          type: object
+          additionalProperties: true
+          description: AND/OR 组合条件。
+        time_window_seconds:
+          type: integer
+          description: 关联时间窗（秒存储）。
+        mode:
+          $ref: '#/components/schemas/CorrelationMode'
+        activated_at:
+          type: string
+          format: date-time
+          description: 规则生效时间，供 BR-04「已运行 ≥30 天」auto 准入计算。
+        confirm_count:
+          type: integer
+        reject_count:
+          type: integer
+        enabled:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    CorrelationMode:
+      type: string
+      description: 关联模式（01-data-model §3 correlation_mode；「候选」译 candidate [ASSUMPTION]）。
+      enum: [auto, candidate]
+    CorrelationRuleCreate:
+      type: object
+      required: [name, conditions, time_window_seconds]
+      properties:
+        name:
+          type: string
+        conditions:
+          type: object
+          additionalProperties: true
+        time_window_seconds:
+          type: integer
+          minimum: 1
+        mode:
+          allOf: [{ $ref: '#/components/schemas/CorrelationMode' }]
+          default: candidate
+        enabled:
+          type: boolean
+          default: true
+    CorrelationRuleUpdate:
+      type: object
+      description: 更新关联规则。切换为 auto 模式时由 service 校验准入门槛（运行 ≥30 天且零误报，BR-04，细则 [TBD-BIZ]）。
+      minProperties: 1
+      properties:
+        name:
+          type: string
+        conditions:
+          type: object
+          additionalProperties: true
+        time_window_seconds:
+          type: integer
+          minimum: 1
+        mode:
+          $ref: '#/components/schemas/CorrelationMode'
+        enabled:
+          type: boolean
+    # ---------- 维护窗口（01-data-model §2.4 maintenance_windows，P2） ----------
+    MaintenanceWindow:
+      type: object
+      description: 维护窗口（01-data-model §2.4 maintenance_windows，BR-07）。窗口内相关告警自动抑制并完整记录，窗口结束未恢复则重新进入管道。
+      required: [id, name, scope, starts_at, ends_at, reason, created_at]
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        scope:
+          type: object
+          additionalProperties: true
+          description: 抑制范围匹配器（集群/namespace/labels 谓词）。
+        starts_at:
+          type: string
+          format: date-time
+        ends_at:
+          type: string
+          format: date-time
+        reason:
+          type: string
+        created_by:
+          type: integer
+          format: int64
+        created_at:
+          type: string
+          format: date-time
+    MaintenanceWindowCreate:
+      type: object
+      required: [name, scope, starts_at, ends_at, reason]
+      properties:
+        name:
+          type: string
+        scope:
+          type: object
+          additionalProperties: true
+        starts_at:
+          type: string
+          format: date-time
+        ends_at:
+          type: string
+          format: date-time
+        reason:
+          type: string
+    # ---------- 候选事件（01-data-model §2.5 incident_candidates，P2，BR-04/D-8） ----------
+    IncidentCandidate:
+      type: object
+      description: 候选事件（01-data-model §2.5 incident_candidates）。关联规则 candidate 模式命中产生，确认后才立项（BR-04）。
+      required: [id, correlation_rule_id, title, member_alert_ids, status, created_at]
+      properties:
+        id:
+          type: integer
+          format: int64
+        correlation_rule_id:
+          type: integer
+          format: int64
+          description: 命中的关联规则。
+        title:
+          type: string
+          description: 规则动态命名。
+        member_alert_ids:
+          type: array
+          items:
+            type: integer
+            format: int64
+          description: 成员告警 id 数组（展示「命中规则 + 成员告警」，交互文档 §4.2）。
+        similarity:
+          type: number
+          description: 相似度展示值 [ASSUMPTION]（计算产出，来源见交互文档 §4.2；P2 事件域详设验证）。
+        status:
+          $ref: '#/components/schemas/IncidentCandidateStatus'
+        reject_reason:
+          type: string
+          description: 驳回原因（自由文本留存于表；提交时按枚举校验，见 CandidateRejectRequest）。
+        decided_by:
+          type: integer
+          format: int64
+        decided_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+    IncidentCandidateStatus:
+      type: string
+      description: 候选事件状态（01-data-model §3 incident_candidate_status；值域 [ASSUMPTION]，P2 事件域详设验证）。
+      enum: [pending, confirmed, rejected]
+    CandidateRejectRequest:
+      type: object
+      description: |
+        驳回候选事件。驳回原因三值来自交互文档 §4.2 候选事件确认流（规则过宽/时间窗过长/富化字段错误）；
+        英译标识为 [ASSUMPTION]（验证方式：P2 事件域详设评审），驳回原因回流规则调优（BR-04）。
+      required: [reject_reason]
+      properties:
+        reject_reason:
+          type: string
+          enum: [rule_too_broad, time_window_too_long, enrichment_field_error]
+          description: 规则过宽（rule_too_broad）/ 时间窗过长（time_window_too_long）/ 富化字段错误（enrichment_field_error）。
+        note:
+          type: string
+          description: 补充说明（可选）[ASSUMPTION]。
+    # ---------- 事件（01-data-model §2.5 incidents，P2） ----------
+    Incident:
+      type: object
+      description: 事件（01-data-model §2.5 incidents）。状态机 6 态与领域文档 §6 严格一致（open 即已立项，D-8）。
+      required: [id, title, severity, status, source, status_page_sync, created_at, updated_at]
+      properties:
+        id:
+          type: integer
+          format: int64
+        title:
+          type: string
+        severity:
+          $ref: '#/components/schemas/IncidentSeverity'
+        status:
+          $ref: '#/components/schemas/IncidentStatus'
+        source:
+          $ref: '#/components/schemas/IncidentSource'
+        candidate_id:
+          type: integer
+          format: int64
+          description: 候选确认立项的来源回链（BR-04）。
+        correlation_rule_id:
+          type: integer
+          format: int64
+          description: auto 归并来源。
+        team:
+          type: string
+        assignee_id:
+          type: integer
+          format: int64
+        created_by:
+          type: integer
+          format: int64
+        status_page_sync:
+          type: boolean
+          description: 是否已同步状态页（BR-06）。
+        cancelled_reason:
+          type: string
+          description: 误报关闭原因（status=cancelled 时必填，D-10）。
+        acknowledged_at:
+          type: string
+          format: date-time
+        mitigated_at:
+          type: string
+          format: date-time
+        resolved_at:
+          type: string
+          format: date-time
+        closed_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    IncidentSeverity:
+      type: string
+      description: 事件严重度（01-data-model §3 incident_severity，实体字典 §5.1 P1-P4）。
+      enum: [P1, P2, P3, P4]
+    IncidentStatus:
+      type: string
+      description: 事件状态机（01-data-model §3 incident_status，领域 §6 Incident 6 态，值域禁止增删改）。
+      enum: [open, acknowledged, cancelled, mitigated, resolved, closed]
+    IncidentSource:
+      type: string
+      description: 事件来源（01-data-model §3 incident_source；状态机入口语义 [ASSUMPTION]，P2 事件域详设验证）。
+      enum: [correlation, manual]
+    IncidentCreate:
+      type: object
+      description: 人工立项（source=manual）。写操作在权限之外仍须过审批流约束（BR-02，权限矩阵只表达「谁可以发起」）。
+      required: [title, severity]
+      properties:
+        title:
+          type: string
+        severity:
+          $ref: '#/components/schemas/IncidentSeverity'
+        team:
+          type: string
+        assignee_id:
+          type: integer
+          format: int64
+        related_alert_ids:
+          type: array
+          items:
+            type: integer
+            format: int64
+          description: 立项时关联的告警（写 incident_alerts）[ASSUMPTION]（P2 事件域详设）。
+    IncidentCancelRequest:
+      type: object
+      description: 误报关闭（状态机 open→cancelled 记录原因；cancelled_reason 必填，D-10）。
+      required: [cancelled_reason]
+      properties:
+        cancelled_reason:
+          type: string
+    IncidentTimelineItem:
+      type: object
+      description: |
+        事件时间线条目（自动+人工）。01-data-model 无独立时间线存储列（timeline 在 postmortems），
+        事件时间线为运行时聚合视图（状态变更/审计/通知记录派生）[ASSUMPTION]（验证方式：P2 事件域详设评审）。
+      required: [occurred_at, kind, summary]
+      properties:
+        occurred_at:
+          type: string
+          format: date-time
+        kind:
+          type: string
+          description: 条目类别（如 status_changed / notification / ai_report / manual_note）[ASSUMPTION]。
+        summary:
+          type: string
+        actor_id:
+          type: integer
+          format: int64
+          description: 操作人；系统自动触发时缺省。
+    IncidentDetail:
+      allOf:
+        - $ref: '#/components/schemas/Incident'
+        - type: object
+          description: 事件详情（交互文档 §4.1 事件详情页：时间线/关联告警/值班与升级状态）。
+          properties:
+            timeline:
+              type: array
+              items:
+                $ref: '#/components/schemas/IncidentTimelineItem'
+            related_alerts:
+              type: array
+              items:
+                $ref: '#/components/schemas/Alert'
+            escalation_summary:
+              type: object
+              additionalProperties: true
+              description: 值班与升级状态摘要（当前级、最近投递与 ack 状态）[ASSUMPTION]（结构随 P2 值班域详设固化）。
+    # ---------- 复盘（01-data-model §2.5 postmortems，P2） ----------
+    Postmortem:
+      type: object
+      description: 复盘报告（01-data-model §2.5 postmortems + postmortem_action_items；blameless，模板生成 L3）。
+      required: [id, incident_id, timeline, root_cause, created_by, created_at, updated_at]
+      properties:
+        id:
+          type: integer
+          format: int64
+        incident_id:
+          type: integer
+          format: int64
+        timeline:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+          description: 时间线（自动+人工汇总，L3）。
+        root_cause:
+          type: string
+        action_items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PostmortemActionItem'
+        created_by:
+          type: integer
+          format: int64
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    PostmortemActionItem:
+      type: object
+      description: 复盘行动项（01-data-model §2.5 postmortem_action_items）。
+      required: [id, content, status, created_at, updated_at]
+      properties:
+        id:
+          type: integer
+          format: int64
+        content:
+          type: string
+        owner_id:
+          type: integer
+          format: int64
+        due_date:
+          type: string
+          format: date
+        status:
+          type: string
+          description: 行动项状态（01-data-model §3 action_item_status；值域 [ASSUMPTION]，P2 事件域详设验证）。
+          enum: [pending, in_progress, done]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    PostmortemUpdate:
+      type: object
+      description: 编辑复盘（root_cause / action_items 分派跟踪，L3）。
+      minProperties: 1
+      properties:
+        root_cause:
+          type: string
+        timeline:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        action_items:
+          type: array
+          items:
+            type: object
+            required: [content]
+            properties:
+              content:
+                type: string
+              owner_id:
+                type: integer
+                format: int64
+              due_date:
+                type: string
+                format: date
+              status:
+                type: string
+                enum: [pending, in_progress, done]
+    # ---------- 巡检（01-data-model §2.6） ----------
+    InspectionRule:
+      type: object
+      description: 巡检规则（01-data-model §2.6 inspection_rules；k8sgpt analyzer 移植，code 为业务键）。
+      required: [id, code, name, category, severity_default, k8s_version_fit, enabled, created_at, updated_at]
+      properties:
+        id:
+          type: integer
+          format: int64
+        code:
+          type: string
+        name:
+          type: string
+        category:
+          type: string
+          description: 规则分类（对齐 k8sgpt analyzer 体系：pod/pvc/deployment/node 等，开放集合）。
+        severity_default:
+          $ref: '#/components/schemas/FindingSeverity'
+        k8s_version_fit:
+          type: string
+          description: 版本适配范围（如 >=1.24）。
+        description:
+          type: string
+          description: 规则说明（可附 AI 解释的规则上下文，A1 链路）。
+        enabled:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    InspectionRuleCreate:
+      type: object
+      required: [code, name, category, severity_default, k8s_version_fit]
+      properties:
+        code:
+          type: string
+        name:
+          type: string
+        category:
+          type: string
+        severity_default:
+          $ref: '#/components/schemas/FindingSeverity'
+        k8s_version_fit:
+          type: string
+        description:
+          type: string
+        enabled:
+          type: boolean
+          default: true
+    InspectionRuleUpdate:
+      type: object
+      minProperties: 1
+      properties:
+        name:
+          type: string
+        category:
+          type: string
+        severity_default:
+          $ref: '#/components/schemas/FindingSeverity'
+        k8s_version_fit:
+          type: string
+        description:
+          type: string
+        enabled:
+          type: boolean
+    InspectionPolicy:
+      type: object
+      description: 巡检策略（01-data-model §2.6 inspection_policies；rule_set 经多对多中间表 D-11，API 以 rule_ids 表达）。
+      required: [id, cluster_id, name, schedule, ai_explain_level, rule_ids, enabled, created_at, updated_at]
+      properties:
+        id:
+          type: integer
+          format: int64
+        cluster_id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        schedule:
+          type: string
+          description: 调度表达式（cron）。
+        ai_explain_level:
+          type: string
+          description: 该级别及以上触发 AI 解释（BR-09）；值域见 01-data-model §3 ai_explain_level [ASSUMPTION]（P1 AI 域详设验证）。
+          enum: ['off', 'info', 'warning', 'critical']
+        rule_ids:
+          type: array
+          items:
+            type: integer
+            format: int64
+          description: 关联规则集（inspection_policy_rules，D-11）。
+        enabled:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    InspectionPolicyCreate:
+      type: object
+      required: [cluster_id, name, schedule, rule_ids]
+      properties:
+        cluster_id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        schedule:
+          type: string
+        ai_explain_level:
+          type: string
+          enum: ['off', 'info', 'warning', 'critical']
+          default: 'off'
+        rule_ids:
+          type: array
+          items:
+            type: integer
+            format: int64
+        enabled:
+          type: boolean
+          default: true
+    InspectionPolicyUpdate:
+      type: object
+      minProperties: 1
+      properties:
+        name:
+          type: string
+        schedule:
+          type: string
+        ai_explain_level:
+          type: string
+          enum: ['off', 'info', 'warning', 'critical']
+        rule_ids:
+          type: array
+          items:
+            type: integer
+            format: int64
+        enabled:
+          type: boolean
+    InspectionRun:
+      type: object
+      description: 巡检执行（01-data-model §2.6 inspection_runs，只读执行记录）。
+      required: [id, policy_id, cluster_id, trigger, status, findings_count, started_at]
+      properties:
+        id:
+          type: integer
+          format: int64
+        policy_id:
+          type: integer
+          format: int64
+        cluster_id:
+          type: integer
+          format: int64
+        trigger:
+          type: string
+          description: 触发方式（01-data-model §3 inspection_run_trigger [ASSUMPTION]，P0 巡检域详设验证）。
+          enum: [schedule, manual]
+        status:
+          type: string
+          description: 执行状态（01-data-model §3 inspection_run_status [ASSUMPTION]，P0 巡检域详设验证）。
+          enum: [running, succeeded, failed]
+        result:
+          type: object
+          additionalProperties: true
+          description: 汇总结果。
+        findings_count:
+          type: integer
+        error:
+          type: string
+        started_at:
+          type: string
+          format: date-time
+        finished_at:
+          type: string
+          format: date-time
+    # ---------- 发现（01-data-model §2.6 findings） ----------
+    Finding:
+      type: object
+      description: 巡检发现（01-data-model §2.6 findings；确定性产出，AI 解释的输入，A1）。
+      required: [id, run_id, cluster_id, rule_code, resource_ref, severity, raw_error, status, created_at, updated_at]
+      properties:
+        id:
+          type: integer
+          format: int64
+        run_id:
+          type: integer
+          format: int64
+        cluster_id:
+          type: integer
+          format: int64
+        rule_code:
+          type: string
+          description: 逻辑引用 inspection_rules.code（业务键，领域 §5.2）。
+        resource_ref:
+          $ref: '#/components/schemas/ResourceRef'
+        severity:
+          $ref: '#/components/schemas/FindingSeverity'
+        raw_error:
+          type: object
+          additionalProperties: true
+          description: 结构化原始错误。
+        status:
+          $ref: '#/components/schemas/FindingStatus'
+        assignee_id:
+          type: integer
+          format: int64
+        ignored_reason:
+          type: string
+          description: 忽略原因（status=ignored 时必填，D-10）。
+        converted_alert_id:
+          type: integer
+          format: int64
+          description: 转告警回链（status=converted_to_alert 时非空，BR-09）。
+        resolved_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    FindingSeverity:
+      type: string
+      description: 发现严重度（01-data-model §3 finding_severity；同 alert_severity [ASSUMPTION]）。
+      enum: [info, warning, critical]
+    FindingStatus:
+      type: string
+      description: 发现状态机（01-data-model §3 finding_status，领域 §6 Finding 6 态，值域禁止增删改）。
+      enum: [open, acknowledged, in_progress, resolved, ignored, converted_to_alert]
+    ResourceRef:
+      type: object
+      description: 结构化资源引用（01-data-model §2.6 findings.resource_ref；业务键组成）。
+      required: [kind, name]
+      properties:
+        kind:
+          type: string
+        namespace:
+          type: string
+        name:
+          type: string
+    FindingIgnoreRequest:
+      type: object
+      description: 忽略发现（状态机 open→ignored 填原因，D-10）。
+      required: [ignored_reason]
+      properties:
+        ignored_reason:
+          type: string
+    # ---------- AI 任务（01-data-model §2.7） ----------
+    AITask:
+      type: object
+      description: |
+        AI 任务（01-data-model §2.7 ai_tasks；预算与审批的载体 BR-03/BR-05）。
+        详情含 AICallLog 摘要统计；逐条调用日志见 GET /ai/tasks/{id}/call-logs。
+      required: [id, type, status, context_refs, budget, calls_used, tokens_used, requires_approval, requested_by, is_partial, created_at, updated_at]
+      properties:
+        id:
+          type: integer
+          format: int64
+        type:
+          type: string
+          description: 任务类型（01-data-model §3 ai_task_type）。
+          enum: [explain, investigate, workflow_gen]
+        status:
+          type: string
+          description: 任务状态机（01-data-model §3 ai_task_status，领域 §6 AITask 8 态，值域禁止增删改）。
+          enum: [created, sanitizing, running, pending_approval, cancelled, completed, failed, budget_exceeded]
+        context_refs:
+          type: object
+          additionalProperties: true
+          description: 上下文对象引用（finding/incident/alert 等 id 集合）。
+        finding_id:
+          type: integer
+          format: int64
+          description: type=explain 时指向解释对象。
+        incident_id:
+          type: integer
+          format: int64
+          description: type=investigate 时指向调查对象。
+        budget:
+          $ref: '#/components/schemas/AITaskBudget'
+        calls_used:
+          type: integer
+        tokens_used:
+          type: integer
+          description: 已消耗输出 token。
+        requires_approval:
+          type: boolean
+        requested_by:
+          type: integer
+          format: int64
+        approval_deadline_at:
+          type: string
+          format: date-time
+          description: 审批截止；默认 30min 超时=拒绝 [ASSUMPTION]（P3 上线前校准）。
+        approved_by:
+          type: integer
+          format: int64
+        decided_at:
+          type: string
+          format: date-time
+        result:
+          type: object
+          additionalProperties: true
+          description: 产出（RCA 报告/解释引用/Workflow 草稿）。
+        is_partial:
+          type: boolean
+          description: 超预算优雅降级的部分结论标注（BR-03）。
+        error:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        finished_at:
+          type: string
+          format: date-time
+    AITaskBudget:
+      type: object
+      description: 预算上限（BR-03：默认 40 次调用 / 100k 输出 token，管理员可调）。
+      required: [max_calls, max_output_tokens]
+      properties:
+        max_calls:
+          type: integer
+        max_output_tokens:
+          type: integer
+    AICallLog:
+      type: object
+      description: AI 调用日志（01-data-model §2.7 ai_call_logs；BR-10 全量审计，只追加；prompt 只存摘要不存明文）。
+      required: [id, task_id, model, prompt_digest, tokens_in, tokens_out, latency_ms, result_code, created_at]
+      properties:
+        id:
+          type: integer
+          format: int64
+        task_id:
+          type: integer
+          format: int64
+        model:
+          type: string
+          description: 实际调用的模型。
+        tool_used:
+          type: string
+          description: 工具标识（A2 循环中的工具调用）。
+        prompt_digest:
+          type: string
+          description: prompt 摘要（sha-256），不存明文（BR-01/BR-12）。
+        tokens_in:
+          type: integer
+        tokens_out:
+          type: integer
+        latency_ms:
+          type: integer
+        result_code:
+          type: string
+          description: 调用结果（01-data-model §3 ai_call_result_code [ASSUMPTION]，P1 AI 网关详设验证）。
+          enum: [ok, error, timeout]
+        error:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+    # ---------- 值班（01-data-model §2.8） ----------
+    OnCallSchedule:
+      type: object
+      description: 排班表（01-data-model §2.8 oncall_schedules；轮换/日历/顶班先以 JSONB 承载 [ASSUMPTION]，P2 值班域详设评审）。
+      required: [id, name, team, rotation_rules, calendar, overrides, enabled, created_at, updated_at]
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        team:
+          type: string
+        rotation_rules:
+          type: object
+          additionalProperties: true
+          description: 轮换规则（成员、周期、顺序）。
+        calendar:
+          type: object
+          additionalProperties: true
+          description: 排班日历数据。
+        overrides:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+          description: 临时顶班 / Out-of-Office（L2）。
+        enabled:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    OnCallScheduleCreate:
+      type: object
+      required: [name, team, rotation_rules, calendar]
+      properties:
+        name:
+          type: string
+        team:
+          type: string
+        rotation_rules:
+          type: object
+          additionalProperties: true
+        calendar:
+          type: object
+          additionalProperties: true
+        overrides:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        enabled:
+          type: boolean
+          default: true
+    OnCallScheduleUpdate:
+      type: object
+      minProperties: 1
+      properties:
+        name:
+          type: string
+        team:
+          type: string
+        rotation_rules:
+          type: object
+          additionalProperties: true
+        calendar:
+          type: object
+          additionalProperties: true
+        overrides:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        enabled:
+          type: boolean
+    EscalationPolicy:
+      type: object
+      description: 升级策略（01-data-model §2.8 escalation_policies；每级超时未确认自动升级 BR-08；渠道降级链 BR-13）。
+      required: [id, name, schedule_id, levels, channel_fallbacks, enabled, created_at, updated_at]
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        schedule_id:
+          type: integer
+          format: int64
+          description: 绑定排班表。
+        levels:
+          type: array
+          items:
+            $ref: '#/components/schemas/EscalationLevel'
+        channel_fallbacks:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+          description: 渠道降级链（IM→短信→电话等，BR-13；组合 [TBD-BIZ]）。
+        enabled:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    EscalationLevel:
+      type: object
+      description: 升级级别定义（实体字典 §5.1 levels；各级默认超时与渠道 [TBD-BIZ]，业务负责人 / P2 设计前）。
+      required: [level, target, channel, timeout_min]
+      properties:
+        level:
+          type: integer
+          minimum: 1
+        target:
+          type: string
+        channel:
+          type: string
+          description: 投递渠道（IM/短信/电话 [TBD-BIZ]）。
+        timeout_min:
+          type: integer
+    EscalationPolicyCreate:
+      type: object
+      required: [name, schedule_id, levels]
+      properties:
+        name:
+          type: string
+        schedule_id:
+          type: integer
+          format: int64
+        levels:
+          type: array
+          items:
+            $ref: '#/components/schemas/EscalationLevel'
+        channel_fallbacks:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        enabled:
+          type: boolean
+          default: true
+    EscalationPolicyUpdate:
+      type: object
+      minProperties: 1
+      properties:
+        name:
+          type: string
+        schedule_id:
+          type: integer
+          format: int64
+        levels:
+          type: array
+          items:
+            $ref: '#/components/schemas/EscalationLevel'
+        channel_fallbacks:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        enabled:
+          type: boolean
+    NotificationRecord:
+      type: object
+      description: 通知记录（01-data-model §2.8 notification_records；每一步投递与响应的审计 BR-08，只追加不可删改）。
+      required: [id, channel, target, content_digest, status, created_at]
+      properties:
+        id:
+          type: integer
+          format: int64
+        channel:
+          type: string
+          description: 投递渠道（IM/短信/电话 [TBD-BIZ]）。
+        target:
+          type: string
+        content_digest:
+          type: string
+          description: 内容摘要（不存全文）。
+        status:
+          type: string
+          description: 通知状态（01-data-model §3 notification_status [ASSUMPTION]，P2 通知中心详设验证）。
+          enum: [queued, sent, failed, acked]
+        ack_action:
+          type: string
+          description: 响应动作（Ack/Escalate/Resolve，L2）。
+        ack_at:
+          type: string
+          format: date-time
+        alert_id:
+          type: integer
+          format: int64
+        incident_id:
+          type: integer
+          format: int64
+        escalation_policy_id:
+          type: integer
+          format: int64
+        escalation_level:
+          type: integer
+          description: 第几级投递（升级留痕，BR-08）。
+        error:
+          type: string
+          description: 失败原因（降级链触发依据，BR-13）。
+        created_at:
+          type: string
+          format: date-time
+    # ---------- 状态页（01-data-model §2.5 status_page_entries，P2） ----------
+    StatusPageEntry:
+      type: object
+      description: 状态页条目（01-data-model §2.5 status_page_entries + status_page_updates；事件状态自动同步 BR-06，同步可人工撤回）。
+      required: [id, incident_id, title, visibility, service_status, created_at, updated_at]
+      properties:
+        id:
+          type: integer
+          format: int64
+        incident_id:
+          type: integer
+          format: int64
+        title:
+          type: string
+          description: 对外标题。
+        visibility:
+          type: string
+          description: 受众（01-data-model §3 status_page_visibility）；默认值取决于状态页受众结论 [TBD-BIZ]。
+          enum: [public, internal]
+        service_status:
+          type: string
+          description: 服务状态快照（如 operational/degraded/outage），值域随状态页详定 [ASSUMPTION]（P2 状态页详设）。
+        updates:
+          type: array
+          items:
+            $ref: '#/components/schemas/StatusPageUpdate'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    StatusPageUpdate:
+      type: object
+      description: 状态页更新（01-data-model §2.5 status_page_updates）。
+      required: [id, entry_id, message, posted_at, is_revoked]
+      properties:
+        id:
+          type: integer
+          format: int64
+        entry_id:
+          type: integer
+          format: int64
+        message:
+          type: string
+        status_snapshot:
+          type: string
+        posted_by:
+          type: integer
+          format: int64
+          description: 发布人（系统同步时缺省）。
+        posted_at:
+          type: string
+          format: date-time
+        is_revoked:
+          type: boolean
+          description: 人工撤回标记（BR-06）。
+        revoked_at:
+          type: string
+          format: date-time
+        revoked_by:
+          type: integer
+          format: int64
+    StatusPageEntryCreate:
+      type: object
+      description: 手工创建状态页条目；P1/P2 事件状态变更自动同步由 POST /incidents/{id}/status-page/sync 触发（BR-06）。
+      required: [incident_id, title, service_status]
+      properties:
+        incident_id:
+          type: integer
+          format: int64
+        title:
+          type: string
+        visibility:
+          type: string
+          enum: [public, internal]
+          default: internal
+        service_status:
+          type: string
+    # ---------- Workflow（01-data-model §2.9，P3 概要级） ----------
+    Workflow:
+      type: object
+      description: |
+        编排定义（01-data-model §2.9 workflows；一版本一行，UNIQUE(name, version)）。
+        source=ai_generated 时 approved_by 必填（BR-05，D-10 库级约束）；人工确认前不得执行。
+        P3 概要级：字段级契约随 P3 详设另立（05-fe-be-boundary §4 注）。
+      required: [id, name, version, yaml, source, enabled, is_current, created_by, created_at, updated_at]
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        version:
+          type: integer
+        yaml:
+          type: string
+          description: 编排定义（YAML 文本）。
+        source:
+          type: string
+          description: 来源（01-data-model §3 workflow_source）。
+          enum: [manual, ai_generated]
+        approved_by:
+          type: integer
+          format: int64
+          description: ai_generated 时必填（BR-05）。
+        enabled:
+          type: boolean
+        is_current:
+          type: boolean
+          description: 当前生效版本。
+        created_by:
+          type: integer
+          format: int64
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    WorkflowCreate:
+      type: object
+      required: [name, yaml]
+      properties:
+        name:
+          type: string
+        yaml:
+          type: string
+        enabled:
+          type: boolean
+          default: true
+    WorkflowVersionCreate:
+      type: object
+      description: 为已有 Workflow 提交新版本（A3 diff 预览后入库；版本号自增）。
+      required: [yaml]
+      properties:
+        yaml:
+          type: string
+    WorkflowFromDescriptionRequest:
+      type: object
+      description: A3 自然语言生成 Workflow（范式 C）。产出为「提议」地位，人工确认（approve）前不得执行（BR-05）。
+      required: [description]
+      properties:
+        description:
+          type: string
+          description: 自然语言自动化需求描述。
+    WorkflowRun:
+      type: object
+      description: 编排执行（01-data-model §2.9 workflow_runs；P3 概要级）。
+      required: [id, workflow_id, workflow_version, yaml_snapshot, trigger_type, status, started_at, created_at]
+      properties:
+        id:
+          type: integer
+          format: int64
+        workflow_id:
+          type: integer
+          format: int64
+        workflow_version:
+          type: integer
+        yaml_snapshot:
+          type: string
+          description: 执行快照（可审计可回放）。
+        trigger_type:
+          type: string
+          description: 触发方式（01-data-model §3 workflow_run_trigger）。
+          enum: [alert, manual, schedule]
+        triggered_by:
+          type: integer
+          format: int64
+        alert_id:
+          type: integer
+          format: int64
+        incident_id:
+          type: integer
+          format: int64
+        status:
+          type: string
+          description: 执行状态机（01-data-model §3 workflow_run_status，领域 §6 WorkflowRun 7 态，值域禁止增删改）。
+          enum: [triggered, running, waiting_approval, cancelled, succeeded, failed, timeout]
+        steps_log:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+          description: 步骤执行日志（含 waiting_approval 的审批步骤）。
+        error:
+          type: string
+        started_at:
+          type: string
+          format: date-time
+        finished_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+    WorkflowRunCreate:
+      type: object
+      description: 手动触发执行（trigger_type=manual）。
+      required: [workflow_id]
+      properties:
+        workflow_id:
+          type: integer
+          format: int64
+        alert_id:
+          type: integer
+          format: int64
+          description: alert 触发上下文（可选）。
+        incident_id:
+          type: integer
+          format: int64
+          description: 事件关联上下文（可选）。
+    # ---------- 审计（01-data-model §2.2 audit_logs） ----------
+    AuditLog:
+      type: object
+      description: 审计日志（01-data-model §2.2 audit_logs；BR-10 全量审计，只追加不可删改 D-6——本资源只提供只读查询）。
+      required: [id, actor_type, action, resource_type, resource_id, detail, created_at]
+      properties:
+        id:
+          type: integer
+          format: int64
+        actor_user_id:
+          type: integer
+          format: int64
+          description: 操作人；系统自动触发时缺省。
+        actor_type:
+          type: string
+          description: user / system [ASSUMPTION]（P0 审计模块详设）。
+          enum: [user, system]
+        action:
+          type: string
+          description: 动作标识，如 cluster.create、alert.acknowledge。
+        resource_type:
+          type: string
+        resource_id:
+          type: string
+        detail:
+          type: object
+          additionalProperties: true
+          description: 变更内容摘要（排除凭据字段）。
+        cost:
+          type: object
+          additionalProperties: true
+          description: 成本计量（AI 类写操作记录 tokens 等计数）。
+        ip:
+          type: string
+        user_agent:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+    # ---------- 分页 envelope（每资源一个，公共 PageMeta 复用） ----------
+    UserPage:
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/User'
+    ClusterPage:
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/Cluster'
+    ProviderPage:
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/Provider'
+    AlertPage:
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/Alert'
+    AIExplanationPage:
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/AIExplanation'
+    EnrichmentRulePage:
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/EnrichmentRule'
+    CorrelationRulePage:
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/CorrelationRule'
+    MaintenanceWindowPage:
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/MaintenanceWindow'
+    IncidentCandidatePage:
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/IncidentCandidate'
+    IncidentPage:
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/Incident'
+    InspectionRulePage:
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/InspectionRule'
+    InspectionPolicyPage:
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/InspectionPolicy'
+    InspectionRunPage:
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/InspectionRun'
+    FindingPage:
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/Finding'
+    AITaskPage:
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/AITask'
+    AICallLogPage:
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/AICallLog'
+    OnCallSchedulePage:
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/OnCallSchedule'
+    EscalationPolicyPage:
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/EscalationPolicy'
+    NotificationRecordPage:
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/NotificationRecord'
+    StatusPageEntryPage:
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/StatusPageEntry'
+    WorkflowPage:
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/Workflow'
+    AuditLogPage:
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/AuditLog'
+# =============================================================================
+# 路径（每条操作标注 x-phase 分期与 x-roles 所需角色；(T) = 限本团队行级过滤）
+# =============================================================================
+paths:
+  # ---------- 认证与用户 ----------
+  /auth/token:
+    post:
+      tags: [auth]
+      operationId: issue_token
+      summary: 登录换取访问令牌（占位）
+      description: |
+        认证入口占位端点。认证方式（SSO/LDAP/本地）`[TBD-INFRA]`（基础设施负责人 / P0 部署设计，
+        决定 M0 session 资源形态、登录页形态与 SSE 认证手段，05-fe-be-boundary §7）；
+        结论确定后本端点与 bearerAuth 方案随之修订。不走 bearer 认证。
+      x-phase: P0
+      x-roles: []
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthTokenRequest'
+      responses:
+        '200':
+          description: 签发成功。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokenResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /users:
+    get:
+      tags: [auth]
+      operationId: list_users
+      summary: 用户列表
+      description: 用户分页列表（管理后台·用户角色页）。矩阵未单列「用户目录查看」，草案收敛为 admin `[ASSUMPTION]`（P0 权限模块详设评审；若展示名解析需全员可读，届时增补只读端点）。
+      x-phase: P0
+      x-roles: [admin]
+      parameters:
+        - $ref: '#/components/parameters/OffsetParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - name: team
+          in: query
+          required: false
+          schema: {type: string}
+          description: 按团队过滤。
+        - name: is_active
+          in: query
+          required: false
+          schema: {type: boolean}
+      responses:
+        '200':
+          description: 用户分页列表。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [auth]
+      operationId: create_user
+      summary: 创建用户
+      description: 创建用户并授予角色（user_roles；developer 角色需带 team_scope，支撑 T 列团队隔离）。不含密码字段（认证 `[TBD-INFRA]`）。
+      x-phase: P0
+      x-roles: [admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserCreate'
+      responses:
+        '201':
+          description: 创建成功。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /users/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    get:
+      tags: [auth]
+      operationId: get_user
+      summary: 用户详情
+      description: 查询单个用户（含角色授予）。
+      x-phase: P0
+      x-roles: [admin]
+      responses:
+        '200':
+          description: 用户详情。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [auth]
+      operationId: update_user
+      summary: 更新用户
+      description: 更新展示名/团队/角色授予；停用以 is_active=false（状态化删除，D-7）。
+      x-phase: P0
+      x-roles: [admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserUpdate'
+      responses:
+        '200':
+          description: 更新成功。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /roles:
+    get:
+      tags: [auth]
+      operationId: list_roles
+      summary: 角色列表
+      description: 角色与权限矩阵（领域文档 §3 五角色：admin/sre/oncall_manager/developer/viewer；permissions 结构 [ASSUMPTION]，P0 权限模块详设）。
+      x-phase: P0
+      x-roles: [admin]
+      responses:
+        '200':
+          description: 角色列表（全集，不分页）。
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Role'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  # ---------- 集群与接入 ----------
+  /clusters:
+    get:
+      tags: [clusters]
+      operationId: list_clusters
+      summary: 集群列表
+      description: 集群分页列表（含连接健康状态）。集群配置管理仅 admin（权限矩阵「集群配置/凭证管理」行）；sre 只读（「集群数据只读」行）[ASSUMPTION]（developer 可见性待 P0 权限详设，巡检看板如需将放开只读）。
+      x-phase: P0
+      x-roles: [admin, sre]
+      parameters:
+        - $ref: '#/components/parameters/OffsetParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - name: environment
+          in: query
+          required: false
+          schema: {type: string}
+        - name: status
+          in: query
+          required: false
+          schema: {$ref: '#/components/schemas/ClusterStatus'}
+      responses:
+        '200':
+          description: 集群分页列表。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClusterPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [clusters]
+      operationId: create_cluster
+      summary: 接入集群
+      description: 接入新集群（管理后台）。凭证只传 credential_id 引用，凭证值一律经密钥管理（D-2 红线）；平台对集群默认只读（BR-02）。
+      x-phase: P0
+      x-roles: [admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClusterCreate'
+      responses:
+        '201':
+          description: 接入成功。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cluster'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /clusters/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    get:
+      tags: [clusters]
+      operationId: get_cluster
+      summary: 集群详情
+      x-phase: P0
+      x-roles: [admin, sre]
+      responses:
+        '200':
+          description: 集群详情。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cluster'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [clusters]
+      operationId: update_cluster
+      summary: 更新集群配置
+      x-phase: P0
+      x-roles: [admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClusterUpdate'
+      responses:
+        '200':
+          description: 更新成功。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cluster'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [clusters]
+      operationId: delete_cluster
+      summary: 移除集群（软删）
+      description: 软删除（deleted_at，D-7）——下游流水（findings/inspection_runs 等）持有外键，不物理删除。
+      x-phase: P0
+      x-roles: [admin]
+      responses:
+        '204':
+          description: 已移除（软删）。
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /clusters/{id}/test-connection:
+    post:
+      tags: [clusters]
+      operationId: test_cluster_connection
+      summary: 测试集群连接
+      description: 立即探活（加载 readonly 凭证，BR-02），回写 status/k8s_version/last_checked_at（04-backend-design §3.8 probe）。
+      x-phase: P0
+      x-roles: [admin]
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: 测试结果。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConnectionTestResult'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  # ---------- Provider ----------
+  /providers:
+    get:
+      tags: [providers]
+      operationId: list_providers
+      summary: Provider 列表
+      description: 告警源提供方分页列表（三类角色统一抽象：source/query/action）。
+      x-phase: P0
+      x-roles: [admin]
+      parameters:
+        - $ref: '#/components/parameters/OffsetParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - name: category
+          in: query
+          required: false
+          schema: {$ref: '#/components/schemas/ProviderCategory'}
+        - name: enabled
+          in: query
+          required: false
+          schema: {type: boolean}
+      responses:
+        '200':
+          description: Provider 分页列表。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProviderPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [providers]
+      operationId: create_provider
+      summary: 创建 Provider
+      description: 创建告警源配置（管理后台）。config 严禁写入任何密钥值（领域 §8 红线；Provider 凭据走 credential_id 引用，D-2）。
+      x-phase: P0
+      x-roles: [admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProviderCreate'
+      responses:
+        '201':
+          description: 创建成功。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Provider'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /providers/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    get:
+      tags: [providers]
+      operationId: get_provider
+      summary: Provider 详情
+      x-phase: P0
+      x-roles: [admin]
+      responses:
+        '200':
+          description: Provider 详情。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Provider'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [providers]
+      operationId: update_provider
+      summary: 更新 Provider
+      x-phase: P0
+      x-roles: [admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProviderUpdate'
+      responses:
+        '200':
+          description: 更新成功。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Provider'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [providers]
+      operationId: delete_provider
+      summary: 删除 Provider（软删）
+      x-phase: P0
+      x-roles: [admin]
+      responses:
+        '204':
+          description: 已删除（软删，D-7）。
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  # ---------- 告警 webhook 机器入口 ----------
+  /alerts/webhook/{provider_key}:
+    post:
+      tags: [alert-ingestion]
+      operationId: ingest_alert_webhook
+      summary: 告警 webhook 接入（机器入口）
+      description: |
+        监控源（Alertmanager/Prometheus 等）上报入口，L1 管道起点（先落盘再入队，ADR-0003）：
+        归一化 → 指纹 upsert 落库（D-1 活跃指纹唯一）→ 入队 → 立即应答 202（body {alert_id, merged}）；
+        同指纹活跃告警合并计数（occurrence_count+1），不产生新行。平台故障不丢告警（非功能 §8）。
+
+        鉴权：不走用户 bearer（security 为空）；Provider 令牌/签名认证 `[ASSUMPTION]`
+        （沿 HLD §1.3 与 04-backend-design §3.2.1，P0 Provider 框架详设定），并施加独立限流（429 时仍落盘）。
+        provider_key 为 Provider 标识（name [ASSUMPTION]，P0 Provider 框架详设定）。
+
+        [CONFLICT-C1] 本路径按契约任务指定为 `POST /alerts/webhook/{provider_key}`；
+        `04-backend-design.md` §4.1/§3.2.1 为 `POST /webhooks/{provider_name}`——待评审裁决，裁决前不引入第三方案。
+      x-phase: P0
+      x-roles: []
+      security: []
+      parameters:
+        - name: provider_key
+          in: path
+          required: true
+          description: Provider 标识（providers.name [ASSUMPTION]）。
+          schema: {type: string}
+      requestBody:
+        required: true
+        description: 原始告警 payload（结构随 Provider 类型，归一化由平台完成）；body 以原始上报格式透传。
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '202':
+          description: 已接收并落盘（落盘即应答，管道异步处理）。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookIngestResult'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  # ---------- 告警 ----------
+  /alerts:
+    get:
+      tags: [alerts]
+      operationId: list_alerts
+      summary: 告警列表（工作台）
+      description: |
+        告警工作台列表：fingerprint 合并计数（occurrence_count）、severity/status/team/fingerprint 过滤
+        （交互文档 §4.1）。developer 限本团队（行级过滤 enrichments.team）；oncall_manager 只读；
+        viewer 不可见（权限矩阵「告警：查看」行）。
+      x-phase: P0
+      x-roles: [admin, sre, oncall_manager, developer(T)]
+      parameters:
+        - $ref: '#/components/parameters/OffsetParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - name: severity
+          in: query
+          required: false
+          schema: {$ref: '#/components/schemas/AlertSeverity'}
+        - name: status
+          in: query
+          required: false
+          schema: {$ref: '#/components/schemas/AlertStatus'}
+        - name: team
+          in: query
+          required: false
+          schema: {type: string}
+        - name: fingerprint
+          in: query
+          required: false
+          schema: {type: string}
+      responses:
+        '200':
+          description: 告警分页列表。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /alerts/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    get:
+      tags: [alerts]
+      operationId: get_alert
+      summary: 告警详情
+      description: 侧栏详情：原始 payload + 富化字段（enrichments）+ 降噪归因支撑字段（合并计数/抑制窗口/状态轨迹）。降噪归因展示方式 `[TBD-UX]`（UX / P0 前端设计前）。
+      x-phase: P0
+      x-roles: [admin, sre, oncall_manager, developer(T)]
+      responses:
+        '200':
+          description: 告警详情。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /alerts/{id}/ack:
+    post:
+      tags: [alerts]
+      operationId: ack_alert
+      summary: 认领告警（Ack）
+      description: |
+        值班人认领（升级链停止，L2/交互 §4.2 告警处置流）。[CONFLICT-C2] 动作名按契约任务用 ack；
+        04-backend-design §4.1 示例为 acknowledge——待评审裁决。
+      x-phase: P0
+      x-roles: [admin, sre, developer(T)]
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: 已认领（assignee_id/acknowledged_at 已写入）。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Alert'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /alerts/{id}/close:
+    post:
+      tags: [alerts]
+      operationId: close_alert
+      summary: 关闭告警
+      description: 人工关闭（notified→resolved；恢复/人工关闭语义，状态机 §6 Alert）。oncall_manager 无关闭权（权限矩阵）。
+      x-phase: P0
+      x-roles: [admin, sre]
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: 已关闭（resolved_at 已写入）。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Alert'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /alerts/{id}/convert-to-incident:
+    post:
+      tags: [alerts]
+      operationId: convert_alert_to_incident
+      summary: 一键转事件
+      description: 人工立项（source=manual，P2 事件落地；P0 为入口占位，见 05-fe-be-boundary §4 M0）。请求体可携带事件标题/严重度/团队与关联告警集合。
+      x-phase: P2
+      x-roles: [admin, sre, developer(T)]
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IncidentCreate'
+      responses:
+        '201':
+          description: 事件已创建并关联本告警。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Incident'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /alerts/{id}/explanations:
+    get:
+      tags: [alerts]
+      operationId: list_alert_explanations
+      summary: 告警的 AI 解释（P1）
+      description: 告警工作台侧栏「AI 解释」tab（交互 §4.1）。存储映射 [ASSUMPTION]：ai_explanations 仅按 finding_id 存储，告警级解释经转告警回链（converted_alert_id）或告警上下文任务派生，P1 AI 域详设评审后回流 01-data-model。
+      x-phase: P1
+      x-roles: [admin, sre, developer(T)]
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+        - $ref: '#/components/parameters/OffsetParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: AI 解释分页列表。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AIExplanationPage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  # ---------- 富化/关联规则与维护窗口 ----------
+  /enrichment-rules:
+    get:
+      tags: [alert-rules]
+      operationId: list_enrichment_rules
+      summary: 富化规则列表
+      description: 富化规则分页列表。规则配置权矩阵未单列，按告警管理域读写推导给 admin/sre `[ASSUMPTION]`（P0 权限详设验证）。
+      x-phase: P0
+      x-roles: [admin, sre]
+      parameters:
+        - $ref: '#/components/parameters/OffsetParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - name: enabled
+          in: query
+          required: false
+          schema: {type: boolean}
+      responses:
+        '200':
+          description: 富化规则分页列表。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnrichmentRulePage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [alert-rules]
+      operationId: create_enrichment_rule
+      summary: 创建富化规则
+      x-phase: P0
+      x-roles: [admin, sre]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EnrichmentRuleCreate'
+      responses:
+        '201':
+          description: 创建成功。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnrichmentRule'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /enrichment-rules/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    get:
+      tags: [alert-rules]
+      operationId: get_enrichment_rule
+      summary: 富化规则详情
+      x-phase: P0
+      x-roles: [admin, sre]
+      responses:
+        '200':
+          description: 富化规则详情。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnrichmentRule'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [alert-rules]
+      operationId: update_enrichment_rule
+      summary: 更新富化规则
+      x-phase: P0
+      x-roles: [admin, sre]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EnrichmentRuleUpdate'
+      responses:
+        '200':
+          description: 更新成功。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnrichmentRule'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [alert-rules]
+      operationId: delete_enrichment_rule
+      summary: 删除富化规则（软删）
+      x-phase: P0
+      x-roles: [admin, sre]
+      responses:
+        '204':
+          description: 已删除（软删，D-7）。
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /correlation-rules:
+    get:
+      tags: [alert-rules]
+      operationId: list_correlation_rules
+      summary: 关联规则列表（P2）
+      x-phase: P2
+      x-roles: [admin, sre]
+      parameters:
+        - $ref: '#/components/parameters/OffsetParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - name: mode
+          in: query
+          required: false
+          schema: {$ref: '#/components/schemas/CorrelationMode'}
+        - name: enabled
+          in: query
+          required: false
+          schema: {type: boolean}
+      responses:
+        '200':
+          description: 关联规则分页列表。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CorrelationRulePage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [alert-rules]
+      operationId: create_correlation_rule
+      summary: 创建关联规则（P2）
+      description: 新建默认 candidate 模式；切换 auto 的准入（运行 ≥30 天且零误报）由 service 校验（BR-04，细则 [TBD-BIZ]）。
+      x-phase: P2
+      x-roles: [admin, sre]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CorrelationRuleCreate'
+      responses:
+        '201':
+          description: 创建成功。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CorrelationRule'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /correlation-rules/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    get:
+      tags: [alert-rules]
+      operationId: get_correlation_rule
+      summary: 关联规则详情（P2）
+      x-phase: P2
+      x-roles: [admin, sre]
+      responses:
+        '200':
+          description: 关联规则详情。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CorrelationRule'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [alert-rules]
+      operationId: update_correlation_rule
+      summary: 更新关联规则（P2）
+      x-phase: P2
+      x-roles: [admin, sre]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CorrelationRuleUpdate'
+      responses:
+        '200':
+          description: 更新成功。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CorrelationRule'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+    delete:
+      tags: [alert-rules]
+      operationId: delete_correlation_rule
+      summary: 删除关联规则（软删，P2）
+      x-phase: P2
+      x-roles: [admin, sre]
+      responses:
+        '204':
+          description: 已删除（软删，D-7）。
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /maintenance-windows:
+    get:
+      tags: [alert-rules]
+      operationId: list_maintenance_windows
+      summary: 维护窗口列表（P2）
+      x-phase: P2
+      x-roles: [admin, sre]
+      parameters:
+        - $ref: '#/components/parameters/OffsetParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - name: active_only
+          in: query
+          required: false
+          schema: {type: boolean}
+          description: 仅返回当前时间落在窗口内的记录 [ASSUMPTION]。
+      responses:
+        '200':
+          description: 维护窗口分页列表。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MaintenanceWindowPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [alert-rules]
+      operationId: create_maintenance_window
+      summary: 创建维护窗口（P2）
+      description: 窗口内相关告警自动抑制并完整记录，窗口结束未恢复则重新进入管道（BR-07）。
+      x-phase: P2
+      x-roles: [admin, sre]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MaintenanceWindowCreate'
+      responses:
+        '201':
+          description: 创建成功。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MaintenanceWindow'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  # ---------- 候选事件（P2，BR-04） ----------
+  /incident-candidates:
+    get:
+      tags: [incident-candidates]
+      operationId: list_incident_candidates
+      summary: 候选事件确认队列
+      description: 候选事件卡片列表（命中规则 + 成员告警 + 相似度，交互 §4.2 候选事件确认流）；默认 status=pending。
+      x-phase: P2
+      x-roles: [admin, sre, oncall_manager, developer(T)]
+      parameters:
+        - $ref: '#/components/parameters/OffsetParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - name: status
+          in: query
+          required: false
+          schema: {$ref: '#/components/schemas/IncidentCandidateStatus'}
+        - name: correlation_rule_id
+          in: query
+          required: false
+          schema: {type: integer, format: int64}
+      responses:
+        '200':
+          description: 候选事件分页列表。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IncidentCandidatePage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /incident-candidates/{id}/confirm:
+    post:
+      tags: [incident-candidates]
+      operationId: confirm_incident_candidate
+      summary: 确认候选事件（立项）
+      description: 确认立项（BR-04/D-8）：创建 incident(source=correlation, candidate_id) + incident_alerts 关联；P1/P2 事件自动同步状态页（BR-06）；关联告警状态置 correlated。
+      x-phase: P2
+      x-roles: [admin, sre, developer(T)]
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '201':
+          description: 已立项，返回新建事件。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Incident'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /incident-candidates/{id}/reject:
+    post:
+      tags: [incident-candidates]
+      operationId: reject_incident_candidate
+      summary: 驳回候选事件
+      description: 驳回（BR-04）：驳回原因三值枚举（规则过宽/时间窗过长/富化字段错误，交互 §4.2），结构化留存并回流规则调优（reject_count 运营统计）。
+      x-phase: P2
+      x-roles: [admin, sre, developer(T)]
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CandidateRejectRequest'
+      responses:
+        '200':
+          description: 已驳回，返回更新后的候选记录。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IncidentCandidate'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  # ---------- 事件（P2/P3） ----------
+  /incidents:
+    get:
+      tags: [incidents]
+      operationId: list_incidents
+      summary: 事件列表
+      description: 事件分页列表。oncall_manager 事件只读（领域 §3）；developer 限本团队（incidents.team 行级过滤）。
+      x-phase: P2
+      x-roles: [admin, sre, oncall_manager, developer(T)]
+      parameters:
+        - $ref: '#/components/parameters/OffsetParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - name: status
+          in: query
+          required: false
+          schema: {$ref: '#/components/schemas/IncidentStatus'}
+        - name: severity
+          in: query
+          required: false
+          schema: {$ref: '#/components/schemas/IncidentSeverity'}
+        - name: team
+          in: query
+          required: false
+          schema: {type: string}
+      responses:
+        '200':
+          description: 事件分页列表。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IncidentPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [incidents]
+      operationId: create_incident
+      summary: 人工立项
+      description: 人工立项（source=manual，状态机入口）。P1/P2 事件立项后自动同步状态页（BR-06）[ASSUMPTION]（同步策略随 P2 事件域详设）。
+      x-phase: P2
+      x-roles: [admin, sre, developer(T)]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IncidentCreate'
+      responses:
+        '201':
+          description: 立项成功。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Incident'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /incidents/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    get:
+      tags: [incidents]
+      operationId: get_incident
+      summary: 事件详情
+      description: 事件详情页（交互 §4.1）：时间线（自动+人工）、关联告警、值班与升级状态、状态页同步状态、升级时间戳。
+      x-phase: P2
+      x-roles: [admin, sre, oncall_manager, developer(T)]
+      responses:
+        '200':
+          description: 事件详情。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IncidentDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /incidents/{id}/acknowledge:
+    post:
+      tags: [incidents]
+      operationId: acknowledge_incident
+      summary: 确认事件
+      description: 状态机 open→acknowledged（值班人确认；升级链停止）。状态机校验在 service 层集中实现，非法迁移 409。
+      x-phase: P2
+      x-roles: [admin, sre, developer(T)]
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: 已确认（acknowledged_at 已写入）。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Incident'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /incidents/{id}/mitigate:
+    post:
+      tags: [incidents]
+      operationId: mitigate_incident
+      summary: 止血完成
+      description: 状态机 acknowledged→mitigated。
+      x-phase: P2
+      x-roles: [admin, sre, developer(T)]
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: 已止血（mitigated_at 已写入）。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Incident'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /incidents/{id}/resolve:
+    post:
+      tags: [incidents]
+      operationId: resolve_incident
+      summary: 根因恢复
+      description: 状态机 mitigated→resolved；resolved 后状态页恢复更新（BR-06，L3）。
+      x-phase: P2
+      x-roles: [admin, sre, developer(T)]
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: 已恢复（resolved_at 已写入）。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Incident'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /incidents/{id}/close:
+    post:
+      tags: [incidents]
+      operationId: close_incident
+      summary: 关闭事件
+      description: 状态机 resolved→closed（复盘完成或无需复盘的低级别，L3 闭环）。
+      x-phase: P2
+      x-roles: [admin, sre, developer(T)]
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: 已关闭（closed_at 已写入）。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Incident'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /incidents/{id}/cancel:
+    post:
+      tags: [incidents]
+      operationId: cancel_incident
+      summary: 误报关闭事件
+      description: 状态机 open→cancelled（记录原因必填，D-10）。本端点为契约任务清单外的状态机补全（领域 §6 Incident 状态机含 cancelled 入口）。
+      x-phase: P2
+      x-roles: [admin, sre, developer(T)]
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IncidentCancelRequest'
+      responses:
+        '200':
+          description: 已取消（cancelled_reason 已留存）。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Incident'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /incidents/{id}/status-page/sync:
+    post:
+      tags: [incidents]
+      operationId: sync_incident_status_page
+      summary: 同步状态页（BR-06）
+      description: 手动触发状态页同步（P1/P2 事件状态变更自动同步；本端点支撑补同步/重同步 [ASSUMPTION] 同步策略随 P2 详设）。
+      x-phase: P2
+      x-roles: [admin, sre]
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+                  description: 本次同步的对外更新说明（可选）。
+      responses:
+        '200':
+          description: 已同步（返回状态页条目）。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusPageEntry'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /incidents/{id}/status-page/undo:
+    post:
+      tags: [incidents]
+      operationId: undo_incident_status_page
+      summary: 撤回状态页同步（BR-06）
+      description: 人工撤回最近的同步更新（status_page_updates.is_revoked 置位，撤回留痕）。
+      x-phase: P2
+      x-roles: [admin, sre]
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: 已撤回（返回更新后的状态页条目）。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusPageEntry'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /incidents/{id}/ai-investigation:
+    post:
+      tags: [incidents]
+      operationId: start_incident_ai_investigation
+      summary: 发起 Agent 自动调查（A2，P3 概要级）
+      description: |
+        事件详情页「发起 Agent 调查」（交互 §4.1，范式 B）。创建 ai_tasks(type=investigate)，
+        上下文=关联告警+Finding+拓扑标签+最近变更（脱敏 BR-01）；高危工具调用挂起 pending_approval（BR-02）；
+        预算 BR-03；结论回写事件时间线。P3 概要级：请求/响应细节随 P3 详设另立。
+      x-phase: P3
+      x-roles: [admin, sre]
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                budget:
+                  $ref: '#/components/schemas/AITaskBudget'
+      responses:
+        '201':
+          description: 调查任务已创建。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AITask'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /incidents/{id}/postmortem:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    get:
+      tags: [incidents]
+      operationId: get_incident_postmortem
+      summary: 获取复盘报告
+      description: 一事一复盘（领域 ER 1:0..1）；P1/P2 事件 resolved 后生成模板（时间线自动汇总，L3）。
+      x-phase: P2
+      x-roles: [admin, sre, developer(T)]
+      responses:
+        '200':
+          description: 复盘报告。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Postmortem'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [incidents]
+      operationId: update_incident_postmortem
+      summary: 编辑复盘报告
+      description: 编辑根因/时间线/行动项（分派与跟踪，L3）；复盘结论回流规则与 runbook（治理规则 §4 第 4 条）。
+      x-phase: P2
+      x-roles: [admin, sre]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostmortemUpdate'
+      responses:
+        '200':
+          description: 已更新。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Postmortem'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  # ---------- 状态页（P2） ----------
+  /status-page/entries:
+    get:
+      tags: [status-page]
+      operationId: list_status_page_entries
+      summary: 状态页条目列表
+      description: 状态页条目与更新时间线。viewer 仅可见 visibility=public（公开看板，领域 §3）；默认可见性 [TBD-BIZ]（状态页受众，业务负责人 / P2 设计前）。
+      x-phase: P2
+      x-roles: [admin, sre, oncall_manager, developer, viewer]
+      parameters:
+        - $ref: '#/components/parameters/OffsetParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - name: visibility
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [public, internal]
+      responses:
+        '200':
+          description: 状态页条目分页列表（按角色过滤可见性）。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusPageEntryPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [status-page]
+      operationId: create_status_page_entry
+      summary: 创建状态页条目
+      description: 手工创建（状态页编辑/发布权：admin/sre，权限矩阵）。
+      x-phase: P2
+      x-roles: [admin, sre]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StatusPageEntryCreate'
+      responses:
+        '201':
+          description: 创建成功。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusPageEntry'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /status-page/entries/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    get:
+      tags: [status-page]
+      operationId: get_status_page_entry
+      summary: 状态页条目详情
+      description: 含 updates 时间线与撤回标记（BR-06）。
+      x-phase: P2
+      x-roles: [admin, sre, oncall_manager, developer, viewer]
+      responses:
+        '200':
+          description: 状态页条目详情。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusPageEntry'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [status-page]
+      operationId: update_status_page_entry
+      summary: 更新状态页条目
+      description: 更新标题/可见性/服务状态或追加 update（每条 update 留痕，撤回走 /incidents/{id}/status-page/undo 或独立撤回操作 [ASSUMPTION]，P2 状态页详设）。
+      x-phase: P2
+      x-roles: [admin, sre]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                title:
+                  type: string
+                visibility:
+                  type: string
+                  enum: [public, internal]
+                service_status:
+                  type: string
+                message:
+                  type: string
+                  description: 追加一条对外更新（可选）。
+      responses:
+        '200':
+          description: 已更新。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusPageEntry'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [status-page]
+      operationId: delete_status_page_entry
+      summary: 删除状态页条目
+      description: 删除条目及其 updates 时间线；已被事件同步引用的条目删除语义（级联删 or 禁止删除改撤回）[ASSUMPTION]（P2 状态页详设，事件侧 status_page_sync 回置）。
+      x-phase: P2
+      x-roles: [admin, sre]
+      responses:
+        '204':
+          description: 已删除。
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  # ---------- 巡检（P0） ----------
+  /inspection-rules:
+    get:
+      tags: [inspections]
+      operationId: list_inspection_rules
+      summary: 巡检规则库列表
+      description: 规则库（k8sgpt analyzer 移植）。developer 可读（巡检看板按规则聚合需要规则元数据）[ASSUMPTION]（P0 权限详设）。
+      x-phase: P0
+      x-roles: [admin, sre, developer]
+      parameters:
+        - $ref: '#/components/parameters/OffsetParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - name: category
+          in: query
+          required: false
+          schema: {type: string}
+        - name: enabled
+          in: query
+          required: false
+          schema: {type: boolean}
+      responses:
+        '200':
+          description: 巡检规则分页列表。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InspectionRulePage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [inspections]
+      operationId: create_inspection_rule
+      summary: 新增巡检规则
+      description: 巡检策略配置权：admin/sre（权限矩阵「巡检：策略配置」列）。
+      x-phase: P0
+      x-roles: [admin, sre]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InspectionRuleCreate'
+      responses:
+        '201':
+          description: 创建成功。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InspectionRule'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /inspection-rules/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    get:
+      tags: [inspections]
+      operationId: get_inspection_rule
+      summary: 巡检规则详情
+      x-phase: P0
+      x-roles: [admin, sre, developer]
+      responses:
+        '200':
+          description: 巡检规则详情。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InspectionRule'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [inspections]
+      operationId: update_inspection_rule
+      summary: 更新巡检规则
+      x-phase: P0
+      x-roles: [admin, sre]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InspectionRuleUpdate'
+      responses:
+        '200':
+          description: 更新成功。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InspectionRule'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [inspections]
+      operationId: delete_inspection_rule
+      summary: 删除巡检规则（软删）
+      description: findings 以 rule_code 逻辑引用本规则，优先停用（enabled=false）；删除为软删（D-7）。
+      x-phase: P0
+      x-roles: [admin, sre]
+      responses:
+        '204':
+          description: 已删除（软删）。
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /inspection-policies:
+    get:
+      tags: [inspections]
+      operationId: list_inspection_policies
+      summary: 巡检策略列表
+      x-phase: P0
+      x-roles: [admin, sre]
+      parameters:
+        - $ref: '#/components/parameters/OffsetParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - name: cluster_id
+          in: query
+          required: false
+          schema: {type: integer, format: int64}
+        - name: enabled
+          in: query
+          required: false
+          schema: {type: boolean}
+      responses:
+        '200':
+          description: 巡检策略分页列表。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InspectionPolicyPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [inspections]
+      operationId: create_inspection_policy
+      summary: 创建巡检策略
+      description: 按集群绑定规则集与 cron 调度（UNIQUE(cluster_id, name)）；ai_explain_level 控制哪些级别触发 AI（BR-09，P1 起生效，P0 默认 off）。
+      x-phase: P0
+      x-roles: [admin, sre]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InspectionPolicyCreate'
+      responses:
+        '201':
+          description: 创建成功。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InspectionPolicy'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /inspection-policies/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    get:
+      tags: [inspections]
+      operationId: get_inspection_policy
+      summary: 巡检策略详情
+      x-phase: P0
+      x-roles: [admin, sre]
+      responses:
+        '200':
+          description: 巡检策略详情。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InspectionPolicy'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [inspections]
+      operationId: update_inspection_policy
+      summary: 更新巡检策略
+      x-phase: P0
+      x-roles: [admin, sre]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InspectionPolicyUpdate'
+      responses:
+        '200':
+          description: 更新成功。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InspectionPolicy'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [inspections]
+      operationId: delete_inspection_policy
+      summary: 删除巡检策略
+      description: 软删（D-7）；历史 inspection_runs 保留。
+      x-phase: P0
+      x-roles: [admin, sre]
+      responses:
+        '204':
+          description: 已删除（软删）。
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /inspection-policies/{id}/run:
+    post:
+      tags: [inspections]
+      operationId: run_inspection_policy
+      summary: 手动触发巡检
+      description: 立即执行一次（trigger=manual，L4）；只读拉取集群快照 → 确定性判定 → 批量写 finding → BR-09 分流（warn 以上转告警）。集群不健康时置 failed 并通知 admin（异常降级）。
+      x-phase: P0
+      x-roles: [admin, sre]
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '201':
+          description: 已创建执行记录（异步执行，状态经轮询或 SSE 获取）。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InspectionRun'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /inspection-runs:
+    get:
+      tags: [inspections]
+      operationId: list_inspection_runs
+      summary: 巡检执行列表
+      x-phase: P0
+      x-roles: [admin, sre, developer]
+      parameters:
+        - $ref: '#/components/parameters/OffsetParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - name: cluster_id
+          in: query
+          required: false
+          schema: {type: integer, format: int64}
+        - name: policy_id
+          in: query
+          required: false
+          schema: {type: integer, format: int64}
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [running, succeeded, failed]
+      responses:
+        '200':
+          description: 巡检执行分页列表。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InspectionRunPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /inspection-runs/{id}:
+    get:
+      tags: [inspections]
+      operationId: get_inspection_run
+      summary: 巡检执行详情
+      description: 只读执行记录（result 汇总与 findings_count）。
+      x-phase: P0
+      x-roles: [admin, sre, developer]
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: 巡检执行详情。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InspectionRun'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  # ---------- 发现（P0/P1） ----------
+  /findings:
+    get:
+      tags: [findings]
+      operationId: list_findings
+      summary: 巡检发现列表（巡检看板）
+      description: 按集群/规则聚合过滤的 finding 列表（巡检看板，交互 §4.1）；developer 限本团队 [ASSUMPTION]（团队数据边界展示 [TBD-UX]，UX / P2 设计前）。
+      x-phase: P0
+      x-roles: [admin, sre, developer(T)]
+      parameters:
+        - $ref: '#/components/parameters/OffsetParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - name: cluster_id
+          in: query
+          required: false
+          schema: {type: integer, format: int64}
+        - name: rule_code
+          in: query
+          required: false
+          schema: {type: string}
+        - name: severity
+          in: query
+          required: false
+          schema: {$ref: '#/components/schemas/FindingSeverity'}
+        - name: status
+          in: query
+          required: false
+          schema: {$ref: '#/components/schemas/FindingStatus'}
+      responses:
+        '200':
+          description: 巡检发现分页列表。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FindingPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /findings/{id}/ack:
+    post:
+      tags: [findings]
+      operationId: ack_finding
+      summary: 认领发现
+      description: |
+        状态机 open→acknowledged（认领）。developer 限本团队认领（权限矩阵「巡检：finding 处置」T 列）。
+        [CONFLICT-C2] 动作名按契约任务用 ack；04-backend-design §4.1 示例为 acknowledge——待评审裁决。
+      x-phase: P0
+      x-roles: [admin, sre, developer(T)]
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: 已认领。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Finding'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /findings/{id}/ignore:
+    post:
+      tags: [findings]
+      operationId: ignore_finding
+      summary: 忽略发现
+      description: 状态机 open→ignored（填原因必填，D-10）。
+      x-phase: P0
+      x-roles: [admin, sre]
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FindingIgnoreRequest'
+      responses:
+        '200':
+          description: 已忽略。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Finding'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /findings/{id}/reopen:
+    post:
+      tags: [findings]
+      operationId: reopen_finding
+      summary: 重新打开发现
+      description: 状态机复现重新打开（in_progress→open）。
+      x-phase: P0
+      x-roles: [admin, sre]
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: 已重新打开。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Finding'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /findings/{id}/explain:
+    post:
+      tags: [findings]
+      operationId: explain_finding
+      summary: 一键 AI 解释（A1，P1）
+      description: |
+        巡检看板「一键 AI 解释」（交互 §4.1）：创建 ai_tasks(type=explain, finding_id)；
+        输入脱敏（BR-01）→ 小模型路由（BR-12）→ 预算检查（BR-03）→ 结构化诊断+修复建议落 ai_explanations；
+        每次调用写 ai_call_logs（BR-10）。前置条件：severity 达到 policy.ai_explain_level（BR-09）。
+      x-phase: P1
+      x-roles: [admin, sre]
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '201':
+          description: 解释任务已创建（结果经轮询或 SSE 获取）。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AITask'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  # ---------- AI 任务中心（P1） ----------
+  /ai/tasks:
+    get:
+      tags: [ai-tasks]
+      operationId: list_ai_tasks
+      summary: AI 任务列表（任务中心）
+      description: |
+        AI 任务中心列表（交互 §4.1）：状态（含 pending_approval 过滤）、预算消耗（calls_used/tokens_used）、
+        发起人等。sre 审批限本团队（权限矩阵「AI 任务」行 T 列，行级过滤）。
+        [CONFLICT-C3] 资源路径按契约任务用 /ai/tasks；04-backend-design §4.1 为 /ai-tasks——待评审裁决。
+      x-phase: P1
+      x-roles: [admin, sre(T)]
+      parameters:
+        - $ref: '#/components/parameters/OffsetParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [created, sanitizing, running, pending_approval, cancelled, completed, failed, budget_exceeded]
+          description: 状态过滤；审批场景固定 status=pending_approval。
+        - name: type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [explain, investigate, workflow_gen]
+        - name: incident_id
+          in: query
+          required: false
+          schema: {type: integer, format: int64}
+        - name: finding_id
+          in: query
+          required: false
+          schema: {type: integer, format: int64}
+      responses:
+        '200':
+          description: AI 任务分页列表。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AITaskPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /ai/tasks/{id}:
+    get:
+      tags: [ai-tasks]
+      operationId: get_ai_task
+      summary: AI 任务详情
+      description: 任务详情含预算消耗、审批字段（approval_deadline_at/approved_by）、结果（is_partial 部分结论标注 BR-03）与 AICallLog 摘要统计。
+      x-phase: P1
+      x-roles: [admin, sre(T)]
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: AI 任务详情。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AITask'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /ai/tasks/{id}/approve:
+    post:
+      tags: [ai-tasks]
+      operationId: approve_ai_task
+      summary: 批准 AI 任务（BR-02/BR-05）
+      description: |
+        AI 审批流（交互 §4.2）：展示「将要执行的工具与参数、预算已消耗」→ 批准（pending_approval→running 继续执行）。
+        默认 30min 超时=拒绝 [ASSUMPTION]（P3 上线前校准）；sre 审批限本团队。
+      x-phase: P1
+      x-roles: [admin, sre(T)]
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: 已批准，任务继续。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AITask'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /ai/tasks/{id}/cancel:
+    post:
+      tags: [ai-tasks]
+      operationId: cancel_ai_task
+      summary: 取消/拒绝 AI 任务
+      description: 拒绝或主动取消（→cancelled，上下文留存可重发，交互 §6 审批超时降级）；A3 生成物拒绝即不落 workflows。
+      x-phase: P1
+      x-roles: [admin, sre(T)]
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: 已取消。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AITask'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /ai/tasks/{id}/call-logs:
+    get:
+      tags: [ai-tasks]
+      operationId: list_ai_task_call_logs
+      summary: AI 调用链审计（BR-10）
+      description: 任务的全量调用日志（模型、工具、prompt 摘要 sha-256、tokens、延迟、结果码）；只追加不可删改（D-6）。
+      x-phase: P1
+      x-roles: [admin, sre(T)]
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+        - $ref: '#/components/parameters/OffsetParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: 调用日志分页列表。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AICallLogPage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  # ---------- 值班与通知（P2） ----------
+  /oncall-schedules:
+    get:
+      tags: [oncall]
+      operationId: list_oncall_schedules
+      summary: 排班表列表
+      description: 排班/升级策略管理：admin 与 oncall_manager（权限矩阵）。
+      x-phase: P2
+      x-roles: [admin, oncall_manager]
+      parameters:
+        - $ref: '#/components/parameters/OffsetParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - name: team
+          in: query
+          required: false
+          schema: {type: string}
+      responses:
+        '200':
+          description: 排班表分页列表。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnCallSchedulePage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [oncall]
+      operationId: create_oncall_schedule
+      summary: 创建排班表
+      x-phase: P2
+      x-roles: [admin, oncall_manager]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OnCallScheduleCreate'
+      responses:
+        '201':
+          description: 创建成功。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnCallSchedule'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /oncall-schedules/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    get:
+      tags: [oncall]
+      operationId: get_oncall_schedule
+      summary: 排班表详情
+      x-phase: P2
+      x-roles: [admin, oncall_manager]
+      responses:
+        '200':
+          description: 排班表详情。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnCallSchedule'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [oncall]
+      operationId: update_oncall_schedule
+      summary: 更新排班表（含临时顶班）
+      description: 编辑轮换规则/日历/overrides（临时顶班与 Out-of-Office，L2）。
+      x-phase: P2
+      x-roles: [admin, oncall_manager]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OnCallScheduleUpdate'
+      responses:
+        '200':
+          description: 更新成功。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnCallSchedule'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [oncall]
+      operationId: delete_oncall_schedule
+      summary: 删除排班表（软删）
+      x-phase: P2
+      x-roles: [admin, oncall_manager]
+      responses:
+        '204':
+          description: 已删除。
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /escalation-policies:
+    get:
+      tags: [oncall]
+      operationId: list_escalation_policies
+      summary: 升级策略列表
+      x-phase: P2
+      x-roles: [admin, oncall_manager]
+      parameters:
+        - $ref: '#/components/parameters/OffsetParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - name: schedule_id
+          in: query
+          required: false
+          schema: {type: integer, format: int64}
+      responses:
+        '200':
+          description: 升级策略分页列表。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EscalationPolicyPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [oncall]
+      operationId: create_escalation_policy
+      summary: 创建升级策略
+      description: 多级升级链定义（levels[{level,target,channel,timeout_min}]；每级超时未确认自动升级 BR-08；渠道降级链 BR-13；各级默认超时与渠道 [TBD-BIZ]）。
+      x-phase: P2
+      x-roles: [admin, oncall_manager]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EscalationPolicyCreate'
+      responses:
+        '201':
+          description: 创建成功。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EscalationPolicy'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /escalation-policies/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    get:
+      tags: [oncall]
+      operationId: get_escalation_policy
+      summary: 升级策略详情
+      x-phase: P2
+      x-roles: [admin, oncall_manager]
+      responses:
+        '200':
+          description: 升级策略详情。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EscalationPolicy'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [oncall]
+      operationId: update_escalation_policy
+      summary: 更新升级策略
+      x-phase: P2
+      x-roles: [admin, oncall_manager]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EscalationPolicyUpdate'
+      responses:
+        '200':
+          description: 更新成功。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EscalationPolicy'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [oncall]
+      operationId: delete_escalation_policy
+      summary: 删除升级策略（软删）
+      x-phase: P2
+      x-roles: [admin, oncall_manager]
+      responses:
+        '204':
+          description: 已删除。
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /notification-records:
+    get:
+      tags: [notifications]
+      operationId: list_notification_records
+      summary: 通知记录审计查询
+      description: 每一步投递/失败/确认的留痕（BR-08/BR-13，只追加 D-6）。可见角色收敛 [ASSUMPTION]（矩阵未单列：admin/sre（事件处置侧）+ oncall_manager（排班侧），P2 通知中心详设验证）。
+      x-phase: P2
+      x-roles: [admin, sre, oncall_manager]
+      parameters:
+        - $ref: '#/components/parameters/OffsetParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - name: alert_id
+          in: query
+          required: false
+          schema: {type: integer, format: int64}
+        - name: incident_id
+          in: query
+          required: false
+          schema: {type: integer, format: int64}
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [queued, sent, failed, acked]
+      responses:
+        '200':
+          description: 通知记录分页列表。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationRecordPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  # ---------- Workflow（P3 概要级） ----------
+  /workflows:
+    get:
+      tags: [workflows]
+      operationId: list_workflows
+      summary: Workflow 列表（P3 概要）
+      description: 编排定义列表（默认仅当前版本 is_current=true；版本历史经版本端点）。Workflow 编辑/执行/审批：admin/sre（权限矩阵）。
+      x-phase: P3
+      x-roles: [admin, sre]
+      parameters:
+        - $ref: '#/components/parameters/OffsetParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: Workflow 分页列表。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowPage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [workflows]
+      operationId: create_workflow
+      summary: 新建 Workflow（P3 概要）
+      description: 手工创建（source=manual）。P3 概要级：字段细节随 P3 编排域详设另立。
+      x-phase: P3
+      x-roles: [admin, sre]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkflowCreate'
+      responses:
+        '201':
+          description: 创建成功。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Workflow'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /workflows/{id}/versions:
+    post:
+      tags: [workflows]
+      operationId: create_workflow_version
+      summary: 提交新版本（P3 概要）
+      description: 新版本入库（一版本一行，UNIQUE(name, version)）；前端 diff 预览与当前版本对比（A3）。
+      x-phase: P3
+      x-roles: [admin, sre]
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkflowVersionCreate'
+      responses:
+        '201':
+          description: 新版本已创建。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Workflow'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /workflows/from-description:
+    post:
+      tags: [workflows]
+      operationId: generate_workflow_from_description
+      summary: NL 生成 Workflow（A3 → 提议，P3 概要）
+      description: |
+        自然语言 → Workflow YAML 草稿（范式 C）：创建 ai_tasks(type=workflow_gen)，产出为「提议」地位
+        （result 携带 YAML 草稿与 diff 预览数据）；人工确认（/workflows/{id}/approve）前不得执行（BR-05）。
+      x-phase: P3
+      x-roles: [admin, sre]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkflowFromDescriptionRequest'
+      responses:
+        '201':
+          description: 生成任务已创建（提议，待确认）。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AITask'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /workflows/{id}/approve:
+    post:
+      tags: [workflows]
+      operationId: approve_workflow
+      summary: 确认 AI 生成的 Workflow（BR-05）
+      description: 人工确认 ai_generated Workflow：落 approved_by（必填，D-10 库级约束）后方可执行；拒绝走对应 AI 任务取消。
+      x-phase: P3
+      x-roles: [admin, sre]
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: 已确认。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Workflow'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /workflow-runs:
+    post:
+      tags: [workflows]
+      operationId: create_workflow_run
+      summary: 触发 Workflow 执行（P3 概要）
+      description: 手动触发（trigger_type=manual）；含高危步骤时进入 waiting_approval（BR-05，状态机 7 态）。
+      x-phase: P3
+      x-roles: [admin, sre]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkflowRunCreate'
+      responses:
+        '201':
+          description: 执行实例已创建。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowRun'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /workflow-runs/{id}:
+    get:
+      tags: [workflows]
+      operationId: get_workflow_run
+      summary: 执行实例详情（P3 概要）
+      description: steps_log 步骤执行日志（含 waiting_approval 审批步骤）。
+      x-phase: P3
+      x-roles: [admin, sre]
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: 执行实例详情。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowRun'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  # ---------- 实时（SSE） ----------
+  /realtime/stream:
+    get:
+      tags: [realtime]
+      operationId: subscribe_realtime_stream
+      summary: 实时事件流（SSE）
+      description: |
+        SSE 订阅端点（text/event-stream）。载荷最小化：推送只通知变更，详情由前端按 resource_id 拉取
+        （04-backend-design §5.2）；心跳为 SSE comment（默认 15s [ASSUMPTION]）。
+
+        **事件类型**（本草案定义，命名权归 04-api，05-fe-be-boundary §1 实时推送行 [ASSUMPTION]）：
+        `alert.updated`（告警状态/计数变更）、`incident.timeline.updated`（事件时间线追加）、
+        `ai_task.updated`（AI 任务状态推进，含 pending_approval）。
+
+        **断连恢复**：客户端重连携带 Last-Event-ID（Redis Stream ID），服务端回放缺失事件后转实时
+        （04-backend-design §5.3）；推送按连接团队 scope 过滤（T 角色不收他团队事件）。
+
+        通道选型（SSE vs WebSocket）最终确认 `[TBD-FE]`（前端 / P0 技术设计时，ADR-0006）；
+        本端点按 SSE 实现但通道无关设计（04-backend-design §5）。
+
+        [CONFLICT-C4] 本路径按契约任务用 /realtime/stream；04-backend-design §5.1 为 /stream——待评审裁决。
+      x-phase: P0
+      x-roles: [admin, sre, oncall_manager, developer, viewer]
+      parameters:
+        - name: topics
+          in: query
+          required: false
+          description: 订阅主题（逗号分隔）；候选集 [ASSUMPTION]（04-backend-design §5.1：alerts/incidents/candidates/inspections/ai-tasks/notifications/system）。
+          style: form
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+        - name: Last-Event-ID
+          in: header
+          required: false
+          description: 断连重连时携带的上次事件 id（Redis Stream ID，回放依据）。
+          schema:
+            type: string
+      responses:
+        '200':
+          description: |
+            SSE 事件流。事件帧示例：
+            id: 1729730000000-0
+            event: alert.updated
+            data: {"resource": "alert", "resource_id": 123, "team": "platform", "occurred_at": "2026-10-24T08:00:00Z"}
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  # ---------- 审计（P0） ----------
+  /audit-logs:
+    get:
+      tags: [audit]
+      operationId: list_audit_logs
+      summary: 审计日志查询（只读）
+      description: |
+        全量写操作与 AI 调用审计（who/when/what/cost，BR-10）；只读查询，不提供任何修改/删除路径
+        （audit_logs 只追加 D-6——本资源无 POST/PUT/DELETE）。仅 admin。
+      x-phase: P0
+      x-roles: [admin]
+      parameters:
+        - $ref: '#/components/parameters/OffsetParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - name: action
+          in: query
+          required: false
+          schema: {type: string}
+          description: 动作标识（如 cluster.create）。
+        - name: resource_type
+          in: query
+          required: false
+          schema: {type: string}
+        - name: resource_id
+          in: query
+          required: false
+          schema: {type: string}
+        - name: actor_user_id
+          in: query
+          required: false
+          schema: {type: integer, format: int64}
+        - name: created_since
+          in: query
+          required: false
+          schema: {type: string, format: date-time}
+          description: 起始时间（UTC）。
+        - name: created_until
+          in: query
+          required: false
+          schema: {type: string, format: date-time}
+          description: 结束时间（UTC）。
+      responses:
+        '200':
+          description: 审计日志分页列表。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditLogPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
