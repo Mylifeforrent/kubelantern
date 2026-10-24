@@ -1,0 +1,42 @@
+{
+  "hooks": {
+    "enabled": true,
+    "timeoutMs": 10000,
+    "events": {
+      "PreToolUse": [
+        {
+          "matcher": "Bash",
+          "hooks": [
+            {
+              "type": "process",
+              "command": "/usr/bin/env",
+              "enabled": true,
+              "statusMessage": "secret-guard：检查 Bash 命令",
+              "args": [
+                "python3",
+                "${ZCODE_PROJECT_DIR}/.zcode/scripts/guard_bash.py"
+              ],
+              "timeoutMs": 10000
+            }
+          ]
+        },
+        {
+          "matcher": "Write|Edit|MultiEdit",
+          "hooks": [
+            {
+              "type": "process",
+              "command": "/usr/bin/env",
+              "enabled": true,
+              "statusMessage": "secret-guard：检查写入内容",
+              "args": [
+                "python3",
+                "${ZCODE_PROJECT_DIR}/.zcode/scripts/guard_write.py"
+              ],
+              "timeoutMs": 10000
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

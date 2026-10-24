@@ -1,0 +1,40 @@
+# --- 本地环境与秘密（红线：禁止入库） ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.kdbx
+id_rsa*
+.netrc
+.htpasswd
+credentials.json
+service-account*.json
+secrets.*
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+build/
+
+# --- Node ---
+node_modules/
+
+# --- 日志/临时 ---
+*.log
+tmp/
+
+# --- macOS / IDE ---
+.DS_Store
+.idea/
+.vscode/
