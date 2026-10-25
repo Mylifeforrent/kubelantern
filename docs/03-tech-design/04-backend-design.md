@@ -22,13 +22,13 @@
 | 类别 | 依赖 | 状态 |
 |---|---|---|
 | 已冻结（HLD/项目规则） | `fastapi`、`uvicorn`、`arq`、`redis`（async）、`sqlalchemy[asyncio]`、`asyncpg`、`alembic`、`kubernetes`、`pydantic`（v2，随 FastAPI） | 版本 `[TBD-INFRA]` |
-| 已冻结（本文展开必需） | `pydantic-settings`（配置，§6.3）、`pytest`、`httpx`（测试栈） | 版本 `[TBD-INFRA]` |
+| 已冻结（本文展开必需） | `pydantic-settings`（配置，§6.3）、`pytest`（测试栈）、`httpx`（测试栈 + AI provider 运行时 HTTP 客户端） | 版本 `[TBD-INFRA]` |
 | 候选（须过依赖审计 `[ASSUMPTION]`，验证方式：P0 工程化评审） | `structlog`（或标准库 JSON formatter）、`croniter`（策略 cron 判定）、`import-linter`（边界静态检查，ADR-0011）、`testcontainers`（或 fixture DB）、`fakeredis`、`pytest-asyncio` 或 `anyio` 插件 | 引入前逐项审计 |
 
 ### 1.2 uv 项目与依赖管理
 
 - 仓库根 `pyproject.toml`（PEP 621 `[project]`）+ `uv.lock`，两者提交仓库；**禁止** pip 手写 `requirements.txt`，**禁止** poetry（项目规则）。
-- 依赖组：运行依赖进 `[project.dependencies]`；开发依赖进 PEP 735 `[dependency-groups]` 的 `dev` 组（pytest/httpx/lint 等）。
+- 依赖组：运行依赖进 `[project.dependencies]`；开发依赖进 PEP 735 `[dependency-groups]` 的 `dev` 组（pytest/lint 等）。`httpx` 同时被 AI provider 运行时使用，必须留在运行依赖组（本地 kind 部署曾因只放 dev 组导致 worker `ModuleNotFoundError`）。
 - 常用命令：`uv add <pkg>` / `uv add --group dev <pkg>` 增依赖；`uv sync` 本地安装；部署安装必须 `uv sync --locked`（锁文件不一致即失败）；运行统一 `uv run <entry>`。
 - 入口脚本经 `[project.scripts]` 暴露：`huntai-api`（api 部署单元入口）与 `huntai-worker`（worker 部署单元入口，接受队列组参数）——与「同镜像多角色」（ADR-0009）配合，镜像 entrypoint 默认 `huntai-api`，worker 以启动命令选择队列组 `[ASSUMPTION]`（验证方式：P0 部署联调，同一镜像双角色冒烟）。
 

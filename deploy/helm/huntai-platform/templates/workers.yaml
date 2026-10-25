@@ -1,0 +1,85 @@
+{{- range $group := .Values.workers.groups }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: huntai-worker-{{ $group }}
+  labels:
+    {{- include "huntai.labels" $ | nindent 4 }}
+    app.kubernetes.io/name: huntai-worker-{{ $group }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: huntai-worker-{{ $group }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: huntai-worker-{{ $group }}
+        app.kubernetes.io/part-of: huntai-sre
+        huntai.io/queue-group: {{ $group }}
+    spec:
+      # 同 API：禁止 Service 环境变量污染 HUNTAI_* 配置。
+      enableServiceLinks: false
+      initContainers:
+        - name: wait-for-api
+          image: "{{ $.Values.image.repository }}:{{ $.Values.image.tag }}"
+          imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -e
+              until python -c "import urllib.request; urllib.request.urlopen('http://{{ include "huntai.apiHost" $ }}:8000/healthz', timeout=2)" 2>/dev/null; do
+                echo "waiting for api"; sleep 2;
+              done
+              {{- if $.Values.readonlyRBAC.enabled }}
+              until [ -s /var/run/huntai/token/token ]; do
+                echo "waiting for readonly service account token"; sleep 2;
+              done
+              {{- end }}
+          volumeMounts:
+            {{- if $.Values.readonlyRBAC.enabled }}
+            - name: readonly-token
+              mountPath: /var/run/huntai/token
+              readOnly: true
+            {{- end }}
+      containers:
+        - name: worker
+          image: "{{ $.Values.image.repository }}:{{ $.Values.image.tag }}"
+          imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          command: ["huntai-worker", {{ $group | quote }}]
+          envFrom:
+            - secretRef:
+                name: huntai-secrets
+          env:
+            - name: HUNTAI_ENV
+              value: {{ $.Values.config.env | quote }}
+            - name: HUNTAI_LOG_LEVEL
+              value: {{ $.Values.config.logLevel | quote }}
+            - name: HUNTAI_LOG_FORMAT
+              value: {{ $.Values.config.logFormat | quote }}
+            - name: HUNTAI_AI_LOCAL_ENDPOINT
+              value: {{ $.Values.config.aiLocalEndpoint | quote }}
+            - name: HUNTAI_AI_LOCAL_MODEL
+              value: {{ $.Values.config.aiLocalModel | quote }}
+            - name: HUNTAI_AI_EGRESS_ENABLED
+              value: {{ $.Values.config.aiEgressEnabled | quote }}
+            - name: HUNTAI_SSE_HEARTBEAT_SECONDS
+              value: {{ $.Values.config.sseHeartbeatSeconds | quote }}
+            {{- if $.Values.readonlyRBAC.enabled }}
+            - name: HUNTAI_DEMO_CLUSTER_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: huntai-readonly-token
+                  key: token
+            {{- end }}
+          resources:
+            {{- toYaml $.Values.workers.resources | nindent 12 }}
+      volumes:
+        {{- if $.Values.readonlyRBAC.enabled }}
+        - name: readonly-token
+          secret:
+            secretName: huntai-readonly-token
+            optional: true
+        {{- end }}
+{{- end }}

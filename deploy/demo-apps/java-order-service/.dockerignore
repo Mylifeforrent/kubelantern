@@ -1,0 +1,9 @@
+.git/
+.idea/
+*.iml
+target/classes/
+target/test-classes/
+target/maven-status/
+target/surefire-reports/
+target/generated-sources/
+target/generated-test-sources/

@@ -1045,6 +1045,7 @@ dependencies = [
     { name = "asyncpg" },
     { name = "cryptography" },
     { name = "fastapi" },
+    { name = "httpx" },
     { name = "kubernetes" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
@@ -1055,7 +1056,6 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "httpx" },
     { name = "pytest" },
     { name = "pytest-cov" },
 ]
@@ -1067,6 +1067,7 @@ requires-dist = [
     { name = "asyncpg", specifier = ">=0.29" },
     { name = "cryptography", specifier = ">=42.0" },
     { name = "fastapi", specifier = ">=0.115" },
+    { name = "httpx", specifier = ">=0.27" },
     { name = "kubernetes", specifier = ">=30.0" },
     { name = "pydantic", specifier = ">=2.7" },
     { name = "pydantic-settings", specifier = ">=2.3" },
@@ -1077,7 +1078,6 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "httpx", specifier = ">=0.27" },
     { name = "pytest", specifier = ">=8.2" },
     { name = "pytest-cov", specifier = ">=5.0" },
 ]

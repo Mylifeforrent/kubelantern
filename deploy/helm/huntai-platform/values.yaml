@@ -1,0 +1,102 @@
+# huntai-platform 本地演示 values。
+# 仅用于 kind 演示：所有口令均为占位符，禁止用于生产。
+# 生产环境必须改为 ExternalSecret / SealedSecret / 密钥管理服务。
+
+image:
+  repository: huntai-sre
+  tag: dev
+  pullPolicy: IfNotPresent
+
+webImage:
+  repository: huntai-web
+  tag: dev
+  pullPolicy: IfNotPresent
+
+# 仅演示用的配置；真实值由部署脚本或 --set 覆盖。
+secrets:
+  databasePassword: your-demo-db-password
+  authSecret: your-demo-auth-secret
+  devAuthPassword: your-demo-auth-password
+  # 32 字节 base64（勿用于生产）。生成方式见 docs/06-deployment/02-build-and-deploy.md。
+  maskKey: aHVudGFpLWRlbW8tbWFzay1rZXktMzJieXRlcyEhISE=
+
+config:
+  env: dev
+  logLevel: info
+  logFormat: json
+  apiHost: 0.0.0.0
+  apiPort: 8000
+  # 演示集群默认不部署 Ollama，AI 任务会走 NoAI 降级（这是可验收行为）。
+  aiLocalEndpoint: http://127.0.0.1:11434
+  aiLocalModel: llama3.1
+  aiEgressEnabled: "false"
+  sseHeartbeatSeconds: "15"
+
+postgres:
+  image: postgres:16-alpine
+  storage: 2Gi
+  # 留空使用 kind 默认 StorageClass（standard / hostPath）。
+  storageClassName: ""
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+redis:
+  image: redis:7-alpine
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+api:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 768Mi
+
+workers:
+  # 5 条队列各 1 个副本（与 02-architecture §6.1 对齐）。
+  groups:
+    - alert-pipeline
+    - notification
+    - escalation
+    - inspection
+    - ai
+  resources:
+    requests:
+      cpu: 50m
+      memory: 192Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+web:
+  replicas: 1
+  nodePort: 30080
+  resources:
+    requests:
+      cpu: 20m
+      memory: 32Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+# 只读 ServiceAccount：巡检连接器只允许只读凭证（BR-02）。
+readonlyRBAC:
+  enabled: true
+
+# 安装/升级后自动迁移 + seed（幂等）。
+seed:
+  enabled: true
+  withAlerts: true

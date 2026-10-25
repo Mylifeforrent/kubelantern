@@ -1,0 +1,51 @@
+{{- if .Values.readonlyRBAC.enabled }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: huntai-readonly
+  labels:
+    {{- include "huntai.labels" . | nindent 4 }}
+---
+# 最小只读权限：巡检快照只读取 pods/deployments/pvcs/nodes（BR-02）。
+# 不能直接用内置 view：它不包含 nodes 列表权限。
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: huntai-readonly
+  labels:
+    {{- include "huntai.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "persistentvolumeclaims", "nodes"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: huntai-readonly
+  labels:
+    {{- include "huntai.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: huntai-readonly
+subjects:
+  - kind: ServiceAccount
+    name: huntai-readonly
+    namespace: {{ .Release.Namespace }}
+---
+# 长期 token Secret（K8s 1.24+ 不再自动创建）。控制器负责填充 token 字段，
+# API/Worker 的 initContainer 会等待挂载文件非空后再启动主容器。
+apiVersion: v1
+kind: Secret
+metadata:
+  name: huntai-readonly-token
+  labels:
+    {{- include "huntai.labels" . | nindent 4 }}
+  annotations:
+    kubernetes.io/service-account.name: huntai-readonly
+type: kubernetes.io/service-account-token
+{{- end }}

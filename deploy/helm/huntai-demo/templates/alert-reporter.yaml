@@ -1,0 +1,66 @@
+{{- if .Values.alerts.enabled }}
+# 模拟业务侧告警源：每 2 分钟向 HuntAI webhook 上报一条演示告警。
+# 同一 fingerprint 重复上报会命中 L1 去重/occurrence_count 合并逻辑。
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: demo-alert-reporter
+  labels:
+    {{- include "demo.labels" . | nindent 4 }}
+    app.kubernetes.io/name: demo-alert-reporter
+spec:
+  schedule: {{ .Values.alerts.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: demo-alert-reporter
+            app.kubernetes.io/part-of: huntai-sre-demo
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: reporter
+              image: {{ .Values.python.image | quote }}
+              imagePullPolicy: IfNotPresent
+              env:
+                - name: HUNTAI_WEBHOOK_URL
+                  value: {{ .Values.alerts.endpoint | quote }}
+              command: ["python", "-c"]
+              args:
+                - |
+                  import json, os, urllib.request
+                  url = os.environ["HUNTAI_WEBHOOK_URL"]
+                  payload = {
+                      "status": "firing",
+                      "severity": "warning",
+                      "title": "演示业务错误率偏高",
+                      "labels": {
+                          "alertname": "DemoServiceErrorRateHigh",
+                          "namespace": "demo",
+                          "team": "platform",
+                          "env": "demo",
+                          "cluster": "huntai-sre",
+                          "source": "react-ops-console",
+                      },
+                  }
+                  request = urllib.request.Request(
+                      url,
+                      data=json.dumps(payload).encode("utf-8"),
+                      headers={"Content-Type": "application/json"},
+                      method="POST",
+                  )
+                  with urllib.request.urlopen(request, timeout=10) as response:
+                      print(response.status, response.read().decode("utf-8"))
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 32Mi
+                limits:
+                  cpu: 100m
+                  memory: 64Mi
+{{- end }}

@@ -13,7 +13,7 @@
 | `03-tech-design/` | 技术设计：系统架构（HLD）、模块详细设计（LLD）、架构决策记录（ADR） | ✅ 已有内容 |
 | `04-api/` | API 契约（以 OpenAPI spec 为单一事实源，文档只做链接与说明） | ✅ 已有内容 |
 | `05-qa/` | 测试计划、用例、测试报告 | ✅ 已有内容 |
-| `06-release/` | 发布计划、变更记录、回滚预案 | 📋 规划中 |
+| `06-release/` | 发布/部署计划、变更记录、回滚预案；本地 kind 演示环境 | ✅ 已有内容 |
 | `07-runbooks/` | 运维手册与应急处置 SOP（`runbook-writer` agent 输出目录） | 📋 规划中 |
 | `08-postmortems/` | 事故复盘，一篇一事，命名 `<日期>-<事件名>.md`（`runbook-writer` agent 输出目录） | 📋 规划中 |
 
@@ -38,6 +38,10 @@
 | `04-api/README.md` | API 契约说明（治理、端点总览、约定速览、验证方法） | accepted | 2026-10-25 |
 | `02-business-design/05-prd.md` | 产品需求文档（PRD）：产品全貌汇总与开放问题总清单 | accepted | 2026-10-24 |
 | `05-qa/01-fe-be-integration-report.md` | 前后端联调报告（页面/端点矩阵、缺陷修复、契约补录、遗留问题） | accepted | 2026-10-25 |
+| `06-release/01-kind-demo-cluster.md` | 本地 3 节点 kind 演示集群 | accepted | 2026-10-25 |
+| `06-release/02-build-and-deploy.md` | 镜像构建与 Helm 部署 | accepted | 2026-10-25 |
+| `06-release/03-feature-acceptance.md` | 功能验收与手工体验 | accepted | 2026-10-25 |
+| `06-release/04-troubleshooting.md` | 排障与清理 | accepted | 2026-10-25 |
 
 ## 3. 命名与编号规范
 

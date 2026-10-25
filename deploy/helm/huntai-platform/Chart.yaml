@@ -1,0 +1,6 @@
+apiVersion: v2
+name: huntai-platform
+description: HuntAI SRE 本地 kind 演示部署（PostgreSQL + Redis + API + 5 类 worker + Web SPA）
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

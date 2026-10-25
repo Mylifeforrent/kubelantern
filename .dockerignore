@@ -1,0 +1,23 @@
+# 后端镜像构建上下文：只保留运行所需文件，避免把 .venv/node_modules/.git 送进 Docker。
+.git
+.zcode
+.venv
+venv
+__pycache__
+*.py[cod]
+.pytest_cache
+.mypy_cache
+.ruff_cache
+node_modules
+frontend/node_modules
+frontend/dist
+deploy
+tests
+docs
+.env
+.env.*
+*.log
+tmp
+.DS_Store
+.idea
+.vscode

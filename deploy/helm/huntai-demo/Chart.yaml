@@ -1,0 +1,6 @@
+apiVersion: v2
+name: huntai-demo
+description: HuntAI SRE kind 演示业务（Java + Python + React，含可开关故障注入）
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

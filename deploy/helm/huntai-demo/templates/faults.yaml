@@ -1,0 +1,165 @@
+{{- if .Values.faults.enabled }}
+{{- if .Values.faults.crashloop }}
+# 场景 1：容器启动即退出 → CrashLoopBackOff（同时会累积 restart_count）
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo-fault-crashloop
+  labels:
+    {{- include "demo.labels" . | nindent 4 }}
+    app.kubernetes.io/name: demo-fault-crashloop
+    huntai.io/fault: crashloop
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: demo-fault-crashloop
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: demo-fault-crashloop
+        app.kubernetes.io/part-of: huntai-sre-demo
+        huntai.io/fault: crashloop
+    spec:
+      containers:
+        - name: crashloop
+          image: {{ .Values.python.image | quote }}
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: CRASH_ON_START
+              value: "1"
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+{{- end }}
+{{- if .Values.faults.imagepull }}
+---
+# 场景 2：镜像不存在 → ErrImagePull / ImagePullBackOff
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo-fault-imagepull
+  labels:
+    {{- include "demo.labels" . | nindent 4 }}
+    app.kubernetes.io/name: demo-fault-imagepull
+    huntai.io/fault: imagepull
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: demo-fault-imagepull
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: demo-fault-imagepull
+        app.kubernetes.io/part-of: huntai-sre-demo
+        huntai.io/fault: imagepull
+    spec:
+      containers:
+        - name: imagepull
+          image: {{ .Values.faults.brokenImage | quote }}
+          imagePullPolicy: Always
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 32Mi
+{{- end }}
+{{- if .Values.faults.pending }}
+---
+# 场景 3：请求不可满足的资源 → Pod Pending（调度失败）
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo-fault-pending
+  labels:
+    {{- include "demo.labels" . | nindent 4 }}
+    app.kubernetes.io/name: demo-fault-pending
+    huntai.io/fault: pending
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: demo-fault-pending
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: demo-fault-pending
+        app.kubernetes.io/part-of: huntai-sre-demo
+        huntai.io/fault: pending
+    spec:
+      containers:
+        - name: pending
+          image: {{ .Values.python.image | quote }}
+          imagePullPolicy: IfNotPresent
+          resources:
+            requests:
+              # kind 节点不可能提供 64 核，调度器保持 Pending。
+              cpu: "64"
+              memory: 256Mi
+            limits:
+              cpu: "64"
+              memory: 256Mi
+{{- end }}
+{{- if .Values.faults.pvc }}
+---
+# 场景 4：引用不存在的 StorageClass → PVC Pending
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: demo-fault-pvc
+  labels:
+    {{- include "demo.labels" . | nindent 4 }}
+    app.kubernetes.io/name: demo-fault-pvc
+    huntai.io/fault: pvc
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: {{ .Values.faults.missingStorageClass | quote }}
+  resources:
+    requests:
+      storage: 1Gi
+{{- end }}
+{{- if .Values.faults.replicasMismatch }}
+---
+# 场景 5：nodeSelector 无匹配节点 → 副本数与 ready 不一致
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo-fault-replicas-mismatch
+  labels:
+    {{- include "demo.labels" . | nindent 4 }}
+    app.kubernetes.io/name: demo-fault-replicas-mismatch
+    huntai.io/fault: replicas
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: demo-fault-replicas-mismatch
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: demo-fault-replicas-mismatch
+        app.kubernetes.io/part-of: huntai-sre-demo
+        huntai.io/fault: replicas
+    spec:
+      nodeSelector:
+        huntai.io/fault-node: "does-not-exist"
+      containers:
+        - name: replicas
+          image: {{ .Values.python.image | quote }}
+          imagePullPolicy: IfNotPresent
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+{{- end }}
+{{- end }}

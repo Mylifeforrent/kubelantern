@@ -1,0 +1,56 @@
+# 演示业务 values：镜像由 deploy/scripts/02-build-images.sh 构建并 kind load。
+
+java:
+  image: huntai-demo/java-order-service:dev
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 768Mi
+
+python:
+  image: huntai-demo/python-inventory-service:dev
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 384Mi
+
+console:
+  image: huntai-demo/react-ops-console:dev
+  replicas: 1
+  nodePort: 30081
+  resources:
+    requests:
+      cpu: 20m
+      memory: 32Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+# 故障注入：默认关闭；验收脚本会以 --set faults.enabled=true 打开。
+# 打开后会产生 CrashLoopBackOff / ImagePullBackOff / Pending / PVC Pending /
+# 副本数不一致等可被巡检规则命中的真实 K8s 资源。
+faults:
+  enabled: false
+  crashloop: true
+  imagepull: true
+  pending: true
+  pvc: true
+  replicasMismatch: true
+  # 故意不存在的镜像；kind 节点拉取失败后进入 ImagePullBackOff/ErrImagePull。
+  brokenImage: ghcr.io/huntai-demo/not-found:0.0.0
+  missingStorageClass: huntai-missing-storage-class
+
+# 演示应用定时向 HuntAI 上报告警（模拟 Alertmanager webhook）。
+# 平台与演示命名空间不同，使用完整 Service DNS。
+alerts:
+  enabled: true
+  schedule: "*/2 * * * *"
+  endpoint: http://huntai-api.huntai.svc.cluster.local:8000/api/v1/alerts/webhook/demo-alertmanager

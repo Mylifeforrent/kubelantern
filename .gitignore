@@ -26,6 +26,7 @@ venv/
 .ruff_cache/
 *.egg-info/
 build/
+target/
 
 # --- Node ---
 node_modules/

@@ -1,0 +1,19 @@
+# 3 节点本地 kind 集群（1 control-plane + 2 worker，对应 3 个 Docker 容器）。
+# 端口映射：
+#   host 8080  -> node 30080（HuntAI Web / API 同源入口）
+#   host 18081 -> node 30081（演示应用控制台）
+# 若宿主机端口被占用，修改 hostPort 后重新创建集群（kind create cluster --config）。
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: huntai-sre
+nodes:
+  - role: control-plane
+    extraPortMappings:
+      - containerPort: 30080
+        hostPort: 8080
+        protocol: TCP
+      - containerPort: 30081
+        hostPort: 18081
+        protocol: TCP
+  - role: worker
+  - role: worker
