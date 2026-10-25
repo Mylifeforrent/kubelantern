@@ -1,0 +1,66 @@
+# 单机 Compose 起步（02-architecture §3.4）：postgres + redis + api + worker 同镜像多角色（ADR-0009）
+# 端口用 5433/6380 避开本机可能已占用的 5432/6379；前端 dev proxy 指向 127.0.0.1:8000。
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_USER: huntai
+      POSTGRES_PASSWORD: your-password
+      POSTGRES_DB: huntai
+    ports:
+      - "5433:5432"
+    volumes:
+      # postgres:18 要求单挂载点 /var/lib/postgresql（数据落版本子目录，便于 pg_upgrade）
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U huntai -d huntai"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build: .
+    command: huntai-api
+    environment:
+      HUNTAI_DATABASE_URL: postgresql+asyncpg://huntai:your-password@postgres:5432/huntai
+      HUNTAI_REDIS_URL: redis://redis:6379/0
+      HUNTAI_API_HOST: 0.0.0.0
+      HUNTAI_API_PORT: 8000
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/healthz')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  worker:
+    build: .
+    # 队列组随启动命令选择（[ASSUMPTION] P0 部署联调；默认跑告警管道组）
+    command: huntai-worker alert-pipeline
+    environment:
+      HUNTAI_DATABASE_URL: postgresql+asyncpg://huntai:your-password@postgres:5432/huntai
+      HUNTAI_REDIS_URL: redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  pgdata:
