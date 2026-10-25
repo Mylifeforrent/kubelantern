@@ -31,9 +31,10 @@ export function InspectionsPage(): JSX.Element {
   const { data: clusterData } = useClusters()
   const clusters = clusterData?.items ?? []
   const clusterId = Number(params.get('cluster') ?? clusters[0]?.id ?? 0)
-  const { data: findingData } = useFindings(clusterId)
+  const severity = params.get('sev') ?? undefined
+  const { data: findingData } = useFindings(clusterId, severity)
   const { data: runData } = useRuns(clusterId)
-  const { data: policyData } = usePolicies()
+  const { data: policyData } = usePolicies(clusterId || undefined)
   const { data: ruleData } = useInspectionRules()
   const actions = useFindingActions()
 

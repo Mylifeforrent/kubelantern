@@ -50,6 +50,26 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/users/me': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * 当前会话用户
+     * @description 返回 bearer 对应的当前用户与角色授予（前端登录后回填会话用）。联调补录：后端已实现，随认证 [TBD-INFRA] 定稿后固化。
+     */
+    get: operations['get_current_user']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/users/{id}': {
     parameters: {
       query?: never
@@ -321,6 +341,26 @@ export interface paths {
      * @description 人工关闭（notified→resolved；恢复/人工关闭语义，状态机 §6 Alert）。oncall_manager 无关闭权（权限矩阵）。
      */
     post: operations['close_alert']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/alerts/{id}/suppress-suggestion': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * 提交误报抑制建议
+     * @description 误报反馈入降噪反馈池（audit_logs 留痕，BR-10）；不直接创建抑制规则，不改变告警状态。原因三值枚举校验；规则调优闭环 [TBD-BIZ]。
+     */
+    post: operations['submit_suppress_suggestion']
     delete?: never
     options?: never
     head?: never
@@ -675,6 +715,26 @@ export interface paths {
      * @description 状态机 open→cancelled（记录原因必填，D-10）。本端点为契约任务清单外的状态机补全（领域 §6 Incident 状态机含 cancelled 入口）。
      */
     post: operations['cancel_incident']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/incidents/{id}/notes': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * 追加人工处理记录（FR-32）
+     * @description 时间线底部输入行追加人工节点；落 audit_logs（action=incident.note），详情时间线派生 kind=manual_note。
+     */
+    post: operations['add_incident_note']
     delete?: never
     options?: never
     head?: never
@@ -2029,6 +2089,10 @@ export interface components {
     IncidentCancelRequest: {
       cancelled_reason: string
     }
+    /** @description 人工处理记录（FR-32；落 audit_logs，详情时间线派生 manual_note）。 */
+    IncidentNoteCreate: {
+      note: string
+    }
     /**
      * @description 事件时间线条目（自动+人工）。01-data-model 无独立时间线存储列（timeline 在 postmortems），
      *     事件时间线为运行时聚合视图（状态变更/审计/通知记录派生）[ASSUMPTION]（验证方式：P2 事件域详设评审）。
@@ -2707,6 +2771,22 @@ export interface components {
     AlertPage: components['schemas']['PageMeta'] & {
       items: components['schemas']['Alert'][]
     }
+    /**
+     * @description 误报抑制建议原因（PRD FR-11 三原因；与前端弹窗值域一致）。
+     * @enum {string}
+     */
+    SuppressSuggestionReason: 'false_positive' | 'expected_noise' | 'duplicate_rule'
+    /** @description 误报抑制建议（降噪反馈池；不直接创建抑制规则，不改变告警状态）。 */
+    SuppressSuggestionRequest: {
+      reason: components['schemas']['SuppressSuggestionReason']
+      /** @description 补充说明（可选），随审计留存供规则调优复核。 */
+      note?: string
+    }
+    SuppressSuggestionResult: {
+      accepted: boolean
+      /** Format: int64 */
+      alert_id: number
+    }
     AIExplanationPage: components['schemas']['PageMeta'] & {
       items: components['schemas']['AIExplanation'][]
     }
@@ -2923,6 +3003,27 @@ export interface operations {
       401: components['responses']['Unauthorized']
       403: components['responses']['Forbidden']
       409: components['responses']['Conflict']
+    }
+  }
+  get_current_user: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description 当前会话用户。 */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['User']
+        }
+      }
+      401: components['responses']['Unauthorized']
     }
   }
   get_user: {
@@ -3352,6 +3453,8 @@ export interface operations {
         status?: components['schemas']['AlertStatus']
         team?: string
         fingerprint?: string
+        /** @description 搜索词，对 title / fingerprint 做模糊匹配（工作台搜索与顶栏全局搜索入口；联调补录）。 */
+        q?: string
       }
       header?: never
       path?: never
@@ -3451,6 +3554,43 @@ export interface operations {
       403: components['responses']['Forbidden']
       404: components['responses']['NotFound']
       409: components['responses']['Conflict']
+    }
+  }
+  submit_suppress_suggestion: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description 资源主键（bigint 代理键，01-data-model §2.1）。 */
+        id: components['parameters']['IdParam']
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SuppressSuggestionRequest']
+      }
+    }
+    responses: {
+      /** @description 已受理。 */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['SuppressSuggestionResult']
+        }
+      }
+      401: components['responses']['Unauthorized']
+      403: components['responses']['Forbidden']
+      404: components['responses']['NotFound']
+      /** @description 请求体校验失败（reason 不在三值枚举内 / note 超长），problem+json。 */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
     }
   }
   convert_alert_to_incident: {
@@ -4162,6 +4302,37 @@ export interface operations {
       403: components['responses']['Forbidden']
       404: components['responses']['NotFound']
       409: components['responses']['Conflict']
+    }
+  }
+  add_incident_note: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description 资源主键（bigint 代理键，01-data-model §2.1）。 */
+        id: components['parameters']['IdParam']
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['IncidentNoteCreate']
+      }
+    }
+    responses: {
+      /** @description 已记录。 */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Incident']
+        }
+      }
+      400: components['responses']['BadRequest']
+      401: components['responses']['Unauthorized']
+      403: components['responses']['Forbidden']
+      404: components['responses']['NotFound']
     }
   }
   sync_incident_status_page: {

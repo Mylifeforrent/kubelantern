@@ -115,6 +115,7 @@ const M: Record<Role, readonly Permission[]> = {
     'route.inspections',
     'alert.ack', // T
     'alert.convert', // T
+    'alert.suppress', // T（契约 x-roles：developer(T)）
     'alert.explain', // T
     'candidate.decide', // T
     'incident.manage', // T

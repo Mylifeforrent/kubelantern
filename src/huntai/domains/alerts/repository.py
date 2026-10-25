@@ -73,6 +73,7 @@ async def list_alerts(
     status: str | None = None,
     team: str | None = None,
     fingerprint: str | None = None,
+    q: str | None = None,
     team_scope: str | None = None,
     offset: int = 0,
     limit: int = 50,
@@ -84,6 +85,10 @@ async def list_alerts(
         stmt = stmt.where(Alert.status == status)
     if fingerprint is not None:
         stmt = stmt.where(Alert.fingerprint == fingerprint)
+    if q:
+        # 工作台搜索：标题 / fingerprint 模糊匹配（契约 /alerts?q=，联调补录）
+        pattern = f"%{q}%"
+        stmt = stmt.where(or_(Alert.title.ilike(pattern), Alert.fingerprint.ilike(pattern)))
     if team is not None:
         stmt = stmt.where(Alert.enrichments["team"].astext == team)
     if team_scope is not None:

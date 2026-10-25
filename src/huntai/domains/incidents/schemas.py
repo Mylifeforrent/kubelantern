@@ -42,6 +42,10 @@ class IncidentCancelRequest(BaseSchema):
     cancelled_reason: str = Field(min_length=1)
 
 
+class IncidentNoteCreateRequest(BaseSchema):
+    note: str = Field(min_length=1, max_length=2000)
+
+
 class IncidentTimelineItem(BaseSchema):
     occurred_at: UtcDateTime
     kind: str
@@ -100,12 +104,25 @@ class CandidateRejectRequest(BaseSchema):
     note: str | None = None
 
 
+class StatusPageUpdateResponse(BaseSchema):
+    id: int
+    entry_id: int
+    message: str
+    status_snapshot: str | None = None
+    posted_by: int | None = None
+    posted_at: UtcDateTime
+    is_revoked: bool
+    revoked_at: UtcDateTime | None = None
+    revoked_by: int | None = None
+
+
 class StatusPageEntryResponse(BaseSchema):
     id: int
     incident_id: int
     title: str
     visibility: str
     service_status: str
+    updates: list[StatusPageUpdateResponse] | None = None
     created_at: UtcDateTime
     updated_at: UtcDateTime
 

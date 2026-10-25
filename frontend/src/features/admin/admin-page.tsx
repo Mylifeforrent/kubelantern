@@ -256,7 +256,7 @@ function UserTable(): JSX.Element {
         >
           <span className="atitle">{u.display_name}</span>
           <span className="tiny text-tx2">
-            {u.username} · {u.team} · {u.is_active ? '启用' : '停用'}
+            {u.username} · {u.team ?? '—'} · {u.is_active ? '启用' : '停用'}
           </span>
         </LinkItem>
       ))}

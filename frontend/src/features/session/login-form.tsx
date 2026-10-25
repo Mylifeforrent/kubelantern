@@ -16,11 +16,12 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>
 
 /** 登录页（Blank 布局；形态随认证 [TBD-INFRA]，当前为占位表单）。
- *  mock 模式演示账号：admin / sre / ocm / dev / view（口令同用户名）。 */
+ *  真实后端 dev 认证：用户名取自 seed（admin / sre-tony / oncall-may / dev-lee / viewer-guest），
+ *  口令统一为后端 .env 的 HUNTAI_DEV_AUTH_PASSWORD。 */
 export function LoginForm(): JSX.Element {
   const { register, handleSubmit, formState } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { username: 'sre', loginPass: 'sre' },
+    defaultValues: { username: 'admin', loginPass: '' },
   })
   const [error, setError] = useState<string | null>(null)
   const navigate = useNavigate()
@@ -75,8 +76,8 @@ export function LoginForm(): JSX.Element {
           {formState.isSubmitting ? '登录中…' : '登录'}
         </Button>
         <p className="tiny text-dim mt-4 leading-relaxed">
-          认证方式（SSO/LDAP/本地）待定稿 [TBD-INFRA]。演示环境账号：admin / sre / ocm / dev /
-          view，口令与用户名相同。
+          认证方式（SSO/LDAP/本地）待定稿 [TBD-INFRA]。dev 账号见后端 seed：admin / sre-tony /
+          oncall-may / dev-lee / viewer-guest，口令为仓库根 .env 的 HUNTAI_DEV_AUTH_PASSWORD。
         </p>
       </form>
     </div>

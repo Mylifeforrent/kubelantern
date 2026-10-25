@@ -40,10 +40,11 @@ def _rule_response(r) -> InspectionRuleResponse:
     )
 
 
-def _policy_response(p) -> InspectionPolicyResponse:
+async def _policy_response(session: AsyncSession, p) -> InspectionPolicyResponse:
     return InspectionPolicyResponse(
         id=p.id, cluster_id=p.cluster_id, name=p.name, schedule=p.schedule,
         ai_explain_level=p.ai_explain_level.value if hasattr(p.ai_explain_level, "value") else p.ai_explain_level,
+        rule_ids=await repo.policy_rule_ids(session, p.id),
         enabled=p.enabled, created_at=p.created_at, updated_at=p.updated_at,
     )
 
@@ -132,9 +133,8 @@ async def list_inspection_policies(
 ):
     offset, limit = clamp_page(offset, limit)
     policies, total = await repo.list_policies(session, cluster_id=cluster_id, enabled=enabled, offset=offset, limit=limit)
-    return InspectionPolicyPage.build(
-        [_policy_response(p) for p in policies], total=total, offset=offset, limit=limit
-    )
+    items = [await _policy_response(session, p) for p in policies]
+    return InspectionPolicyPage.build(items, total=total, offset=offset, limit=limit)
 
 
 @router.post("/inspection-policies", response_model=InspectionPolicyResponse, status_code=201, dependencies=[Depends(require_permission("inspection_policies", "write"))])
@@ -143,7 +143,8 @@ async def create_inspection_policy(
     principal: Principal = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
-    return _policy_response(await service.create_policy(session, payload, actor_id=principal.user_id))
+    policy = await service.create_policy(session, payload, actor_id=principal.user_id)
+    return await _policy_response(session, policy)
 
 
 @router.get("/inspection-policies/{policy_id}", response_model=InspectionPolicyResponse, dependencies=[Depends(require_permission("inspection_policies", "read"))])
@@ -151,7 +152,7 @@ async def get_inspection_policy(policy_id: int, session: AsyncSession = Depends(
     policy = await repo.get_policy(session, policy_id)
     if policy is None:
         raise not_found("inspection_policies", policy_id)
-    return _policy_response(policy)
+    return await _policy_response(session, policy)
 
 
 @router.put("/inspection-policies/{policy_id}", response_model=InspectionPolicyResponse, dependencies=[Depends(require_permission("inspection_policies", "write"))])
@@ -160,7 +161,8 @@ async def update_inspection_policy(
     principal: Principal = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
-    return _policy_response(await service.update_policy(session, policy_id, payload, actor_id=principal.user_id))
+    policy = await service.update_policy(session, policy_id, payload, actor_id=principal.user_id)
+    return await _policy_response(session, policy)
 
 
 @router.delete("/inspection-policies/{policy_id}", status_code=204, dependencies=[Depends(require_permission("inspection_policies", "write"))])

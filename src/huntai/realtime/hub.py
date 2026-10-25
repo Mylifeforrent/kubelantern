@@ -92,11 +92,15 @@ class RealtimeHub:
                 if not entries:
                     replaying = False
                     cursor = "$"
-                    entries = await self._redis.xread({STREAM_KEY: "$"}, block=heartbeat_seconds * 1000, count=100)
-                    entries = entries.get(STREAM_KEY, []) if entries else []
+                    result = await self._redis.xread(
+                        {STREAM_KEY: "$"}, block=heartbeat_seconds * 1000, count=100
+                    )
+                    entries = _xread_entries(result)
             else:
-                result = await self._redis.xread({STREAM_KEY: cursor}, block=heartbeat_seconds * 1000, count=100)
-                entries = result.get(STREAM_KEY, []) if result else []
+                result = await self._redis.xread(
+                    {STREAM_KEY: cursor}, block=heartbeat_seconds * 1000, count=100
+                )
+                entries = _xread_entries(result)
 
             if not entries:
                 yield ": ping\n\n"
@@ -110,6 +114,15 @@ class RealtimeHub:
                 if team is not None and event_team is not None and event_team != team:
                     continue
                 yield _frame(stream_id, fields)
+
+
+def _xread_entries(result) -> list[tuple[str, dict[str, str]]]:
+    """redis-py XREAD 返回 [(stream_key, [(id, fields), ...])]，取首个流的条目。"""
+    if not result:
+        return []
+    for _stream_key, entries in result:
+        return list(entries)
+    return []
 
 
 def _frame(stream_id: str, fields: dict[str, str]) -> str:

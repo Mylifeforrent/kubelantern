@@ -515,6 +515,24 @@ const ROUTES: Route[] = [
     },
   },
   {
+    method: 'POST',
+    pattern: /^\/incidents\/(\d+)\/notes$/,
+    handle: ({ params, body, user }) => {
+      const i = byId(db.incidents, params[0])
+      if (!i) return problem(404)
+      const note = String(body.note ?? '').trim()
+      if (!note) return problem(400)
+      ;(db.timelines[i.id] ??= []).push({
+        occurred_at: nowIso(),
+        kind: 'manual_note',
+        summary: note,
+        actor_id: user.id,
+      })
+      addAudit(user.username, 'incident.note', 'incident', String(i.id), { note })
+      return i
+    },
+  },
+  {
     method: 'GET',
     pattern: /^\/incidents\/(\d+)\/postmortem$/,
     handle: ({ params }) => {

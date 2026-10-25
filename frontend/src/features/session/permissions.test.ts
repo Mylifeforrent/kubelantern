@@ -70,7 +70,7 @@ const EXPECTED: Record<Role, Partial<Record<Permission, boolean>>> = {
     'route.inspections': true,
     'alert.ack': true, // T
     'alert.close': false, // 矩阵：关闭 N
-    'alert.suppress': false,
+    'alert.suppress': true, // T（契约 x-roles：developer(T)）
     'candidate.decide': true, // T
     'incident.manage': true, // T
     'incident.status-page': false,

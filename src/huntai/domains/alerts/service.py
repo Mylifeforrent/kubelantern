@@ -281,21 +281,18 @@ async def close(
 
 
 async def suppress_suggestion(
-    session: AsyncSession, alert_id: int, *, actor_id: int, reason: str | None
+    session: AsyncSession, alert: Alert, *, actor_id: int, reason: str, note: str | None
 ) -> dict[str, Any]:
-    """误报抑制建议（契约草案待补端点；写入降噪规则反馈池=audit）。"""
-    alert = await repo.get_alert(session, alert_id)
-    if alert is None:
-        raise not_found("alerts", alert_id)
+    """误报抑制建议（FR-11；写入降噪规则反馈池=audit，不直接改告警状态）。"""
     await record_audit(
         session,
         action="alert.suppress_suggestion",
         resource_type="alerts",
         resource_id=alert.id,
-        detail={"fingerprint": alert.fingerprint, "reason": reason or ""},
+        detail={"fingerprint": alert.fingerprint, "reason": reason, "note": note or ""},
         actor_id=actor_id,
     )
-    return {"accepted": True}
+    return {"accepted": True, "alert_id": alert.id}
 
 
 async def convert_to_incident(

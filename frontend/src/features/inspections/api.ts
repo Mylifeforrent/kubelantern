@@ -14,12 +14,18 @@ export function useClusters() {
   })
 }
 
-export function useFindings(clusterId: number) {
+export function useFindings(clusterId: number, severity?: string) {
   return useQuery({
-    queryKey: qk.inspections.findings(clusterId, { limit: 200 }),
+    queryKey: qk.inspections.findings(clusterId, { limit: 200, severity }),
     queryFn: async () => {
       const res = await api.GET('/findings', {
-        params: { query: { cluster_id: clusterId, limit: 200 } },
+        params: {
+          query: {
+            cluster_id: clusterId,
+            severity: severity as 'info' | 'warning' | 'critical' | undefined,
+            limit: 200,
+          },
+        },
       })
       return unwrap(res)
     },
@@ -30,17 +36,21 @@ export function useRuns(clusterId: number) {
   return useQuery({
     queryKey: qk.inspections.runs(clusterId),
     queryFn: async () => {
-      const res = await api.GET('/inspection-runs', { params: { query: { limit: 50 } } })
+      const res = await api.GET('/inspection-runs', {
+        params: { query: { cluster_id: clusterId, limit: 50 } },
+      })
       return unwrap(res)
     },
   })
 }
 
-export function usePolicies() {
+export function usePolicies(clusterId?: number) {
   return useQuery({
-    queryKey: qk.inspections.policies(),
+    queryKey: qk.inspections.policies(clusterId),
     queryFn: async () => {
-      const res = await api.GET('/inspection-policies', { params: { query: { limit: 100 } } })
+      const res = await api.GET('/inspection-policies', {
+        params: { query: { cluster_id: clusterId, limit: 100 } },
+      })
       return unwrap(res)
     },
   })

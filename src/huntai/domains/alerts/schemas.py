@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from enum import Enum
 from typing import Any
 
 from pydantic import Field
@@ -27,6 +28,24 @@ class AlertResponse(BaseSchema):
     suppressed_by_window_id: int | None = None
     created_at: UtcDateTime
     updated_at: UtcDateTime
+
+
+class SuppressSuggestionReason(str, Enum):
+    """误报抑制建议原因（PRD FR-11 三原因；值域与前端弹窗一致）。"""
+
+    FALSE_POSITIVE = "false_positive"
+    EXPECTED_NOISE = "expected_noise"
+    DUPLICATE_RULE = "duplicate_rule"
+
+
+class SuppressSuggestionRequest(BaseSchema):
+    reason: SuppressSuggestionReason
+    note: str | None = Field(default=None, max_length=500)
+
+
+class SuppressSuggestionResult(BaseSchema):
+    accepted: bool
+    alert_id: int
 
 
 class AlertDetailResponse(AlertResponse):

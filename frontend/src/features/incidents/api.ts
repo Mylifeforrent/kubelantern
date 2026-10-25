@@ -89,16 +89,16 @@ export function useIncidentAction() {
   })
 }
 
-/** 处理记录（人工时间线条目追加；幂等去重随事件契约定稿 [ASSUMPTION]） */
+/** 处理记录（人工时间线条目追加，FR-32；契约 POST /incidents/{id}/notes） */
 export function useAddTimelineNote() {
   const qc = useQueryClient()
   return useMutation({
-    // 契约草案未单列时间线追加端点：P2 事件域详设后收敛为 POST /incidents/{id}/notes [ASSUMPTION]
-    mutationFn: ({ id, note }: { id: number; note: string }) => {
-      // demo：以 acknowledge 动作外的记录方式不可表达，改在本地 mock 中以 audit 形式留痕
-      void id
-      void note
-      return Promise.resolve({ ok: true as const })
+    mutationFn: async ({ id, note }: { id: number; note: string }) => {
+      const res = await api.POST('/incidents/{id}/notes', {
+        params: { path: { id } },
+        body: { note },
+      })
+      return unwrap<Incident>(res)
     },
     onSuccess: (_r, vars) => {
       void qc.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'incidents' })
@@ -119,7 +119,7 @@ export function useStatusPageSync() {
       const res = undo
         ? await api.POST('/incidents/{id}/status-page/undo', { params: { path: { id } } })
         : await api.POST('/incidents/{id}/status-page/sync', { params: { path: { id } } })
-      return unwrap<unknown>(res) as Incident
+      return unwrap<unknown>(res)
     },
     onSuccess: (_result, vars) => {
       invalidate()

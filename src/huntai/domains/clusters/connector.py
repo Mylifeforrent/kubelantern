@@ -47,7 +47,11 @@ def _build_api(cluster: Cluster, cred: Credential) -> ApiClient:
 
 
 def _probe_sync(cluster: Cluster, cred: Credential) -> ProbeResult:
-    api_client = _build_api(cluster, cred)
+    try:
+        api_client = _build_api(cluster, cred)
+    except ProblemError as exc:
+        # 凭证未配置属配置态失败：探活接口按 disconnected 返回，不升级为 500
+        return ProbeResult(status="disconnected", k8s_version=None, message=exc.detail)
     try:
         version = k8s_client.VersionApi(api_client).get_code()
         return ProbeResult(

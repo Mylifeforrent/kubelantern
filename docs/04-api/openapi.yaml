@@ -1002,6 +1002,14 @@ components:
       properties:
         cancelled_reason:
           type: string
+    IncidentNoteCreate:
+      type: object
+      description: 人工处理记录（FR-32；落 audit_logs，详情时间线派生 manual_note）。
+      required: [note]
+      properties:
+        note:
+          type: string
+          maxLength: 2000
     IncidentTimelineItem:
       type: object
       description: |
@@ -1995,6 +2003,30 @@ components:
               type: array
               items:
                 $ref: '#/components/schemas/Alert'
+    SuppressSuggestionReason:
+      type: string
+      description: 误报抑制建议原因（PRD FR-11 三原因；与前端弹窗值域一致）。
+      enum: [false_positive, expected_noise, duplicate_rule]
+    SuppressSuggestionRequest:
+      type: object
+      description: 误报抑制建议（降噪反馈池；不直接创建抑制规则，不改变告警状态）。
+      required: [reason]
+      properties:
+        reason:
+          $ref: '#/components/schemas/SuppressSuggestionReason'
+        note:
+          type: string
+          maxLength: 500
+          description: 补充说明（可选），随审计留存供规则调优复核。
+    SuppressSuggestionResult:
+      type: object
+      required: [accepted, alert_id]
+      properties:
+        accepted:
+          type: boolean
+        alert_id:
+          type: integer
+          format: int64
     AIExplanationPage:
       allOf:
         - $ref: '#/components/schemas/PageMeta'
@@ -2268,6 +2300,23 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '409':
           $ref: '#/components/responses/Conflict'
+  /users/me:
+    get:
+      tags: [auth]
+      operationId: get_current_user
+      summary: 当前会话用户
+      description: 返回 bearer 对应的当前用户与角色授予（前端登录后回填会话用）。联调补录：后端已实现，随认证 [TBD-INFRA] 定稿后固化。
+      x-phase: P0
+      x-roles: [全部角色]
+      responses:
+        '200':
+          description: 当前会话用户。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
   /users/{id}:
     parameters:
       - $ref: '#/components/parameters/IdParam'
@@ -2692,6 +2741,11 @@ paths:
           in: query
           required: false
           schema: {type: string}
+        - name: q
+          in: query
+          required: false
+          schema: {type: string}
+          description: 搜索词，对 title / fingerprint 做模糊匹配（工作台搜索与顶栏全局搜索入口；联调补录）。
       responses:
         '200':
           description: 告警分页列表。
@@ -2780,6 +2834,37 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/Conflict'
+  /alerts/{id}/suppress-suggestion:
+    post:
+      tags: [alerts]
+      operationId: submit_suppress_suggestion
+      summary: 提交误报抑制建议
+      description: 误报反馈入降噪反馈池（audit_logs 留痕，BR-10）；不直接创建抑制规则，不改变告警状态。原因三值枚举校验；规则调优闭环 [TBD-BIZ]。
+      x-phase: P0
+      x-roles: [admin, sre, developer(T)]
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SuppressSuggestionRequest'
+      responses:
+        '200':
+          description: 已受理。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuppressSuggestionResult'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: 请求体校验失败（reason 不在三值枚举内 / note 超长），problem+json。
   /alerts/{id}/convert-to-incident:
     post:
       tags: [alerts]
@@ -3447,6 +3532,37 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/Conflict'
+  /incidents/{id}/notes:
+    post:
+      tags: [incidents]
+      operationId: add_incident_note
+      summary: 追加人工处理记录（FR-32）
+      description: 时间线底部输入行追加人工节点；落 audit_logs（action=incident.note），详情时间线派生 kind=manual_note。
+      x-phase: P2
+      x-roles: [admin, sre, developer(T)]
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IncidentNoteCreate'
+      responses:
+        '201':
+          description: 已记录。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Incident'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
   /incidents/{id}/status-page/sync:
     post:
       tags: [incidents]
@@ -4847,15 +4963,16 @@ paths:
         SSE 订阅端点（text/event-stream）。载荷最小化：推送只通知变更，详情由前端按 resource_id 拉取
         （04-backend-design §5.2）；心跳为 SSE comment（默认 15s [ASSUMPTION]）。
 
-        **事件类型**（本草案定义，命名权归 04-api，05-fe-be-boundary §1 实时推送行 [ASSUMPTION]）：
+        **事件类型**（命名权归 04-api，05-fe-be-boundary §1 实时推送行；已联调验证）：
         `alert.updated`（告警状态/计数变更）、`incident.timeline.updated`（事件时间线追加）、
         `ai_task.updated`（AI 任务状态推进，含 pending_approval）。
+        载荷最小化：`{resource, resource_id, team, occurred_at}`，详情由前端按 resource_id 拉取。
 
         **断连恢复**：客户端重连携带 Last-Event-ID（Redis Stream ID），服务端回放缺失事件后转实时
         （04-backend-design §5.3）；推送按连接团队 scope 过滤（T 角色不收他团队事件）。
 
-        通道选型（SSE vs WebSocket）最终确认 `[TBD-FE]`（前端 / P0 技术设计时，ADR-0006）；
-        本端点按 SSE 实现但通道无关设计（04-backend-design §5）。
+        通道选型（SSE vs WebSocket）默认按 SSE 实现并已联调验证（ADR-0006）；
+        若后续改 WebSocket 仅替换前端实现类（04-backend-design §5）。
 
         [CONFLICT-C4] 本路径按契约任务用 /realtime/stream；04-backend-design §5.1 为 /stream——待评审裁决。
       x-phase: P0

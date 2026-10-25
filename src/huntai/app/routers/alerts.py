@@ -32,9 +32,12 @@ from huntai.domains.alerts.schemas import (
     MaintenanceWindowCreateRequest,
     MaintenanceWindowPage,
     MaintenanceWindowResponse,
+    SuppressSuggestionRequest,
+    SuppressSuggestionResult,
     WebhookIngestResult,
 )
 from huntai.domains.clusters import repository as clusters_repo
+from huntai.domains.incidents.schemas import IncidentResponse
 
 router = APIRouter()
 
@@ -110,6 +113,7 @@ async def list_alerts(
     status: str | None = None,
     team: str | None = None,
     fingerprint: str | None = None,
+    q: str | None = None,
     offset: int = 0,
     limit: int = 50,
     scope: TeamScope | None = Depends(require_permission("alerts", "read")),
@@ -117,7 +121,7 @@ async def list_alerts(
 ):
     offset, limit = clamp_page(offset, limit)
     alerts, total = await service.list_alerts(
-        session, severity=severity, status=status, team=team, fingerprint=fingerprint,
+        session, severity=severity, status=status, team=team, fingerprint=fingerprint, q=q,
         team_scope=scope.team if scope else None, offset=offset, limit=limit,
     )
     return AlertPage.build(
@@ -171,7 +175,7 @@ async def close_alert(
 @router.post(
     "/alerts/{alert_id}/convert-to-incident",
     status_code=http_status.HTTP_201_CREATED,
-    response_model=None,
+    response_model=IncidentResponse,
 )
 async def convert_alert_to_incident(
     alert_id: int,
@@ -180,16 +184,12 @@ async def convert_alert_to_incident(
     principal: Principal = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
-    from huntai.domains.incidents.schemas import IncidentResponse
-
     body = payload or {}
     incident = await service.convert_to_incident(
         session, alert_id, actor_id=principal.user_id,
         title=body.get("title"), severity=body.get("severity"), team=body.get("team"),
         extra_alert_ids=body.get("related_alert_ids"),
     )
-    from huntai.domains.incidents import service as incidents_service
-
     return IncidentResponse(
         id=incident.id, title=incident.title, severity=incident.severity,
         status=incident.status, source=incident.source, candidate_id=incident.candidate_id,
@@ -202,19 +202,26 @@ async def convert_alert_to_incident(
     )
 
 
-@router.post("/alerts/{alert_id}/suppress-suggestion")
+@router.post("/alerts/{alert_id}/suppress-suggestion", response_model=SuppressSuggestionResult)
 async def suppress_suggestion(
     alert_id: int,
-    payload: dict | None = None,
+    payload: SuppressSuggestionRequest,
+    scope: TeamScope | None = Depends(require_permission("alerts", "acknowledge")),
     principal: Principal = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
-    """契约草案待补端点（M0 验收流「误报抑制建议提交」；前端已消费）。"""
-    result = await service.suppress_suggestion(
-        session, alert_id, actor_id=principal.user_id,
-        reason=(payload or {}).get("reason"),
+    """误报抑制建议（FR-11）：三原因枚举 + 可选说明，写 audit 反馈池。
+
+    权限复用 alerts.acknowledge：当前角色集（admin/sre Y、developer T）与契约
+    x-roles 完全一致，避免新增权限位与角色数据迁移；若后续授权分化再拆
+    alerts.suppress action。
+    """
+    alert = await service.get_alert(session, alert_id)
+    _assert_team_visible(alert, scope)
+    return await service.suppress_suggestion(
+        session, alert, actor_id=principal.user_id,
+        reason=payload.reason.value, note=payload.note,
     )
-    return result
 
 
 @router.get("/alerts/{alert_id}/explanations", response_model=AIExplanationPage)

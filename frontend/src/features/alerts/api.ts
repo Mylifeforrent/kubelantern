@@ -1,8 +1,8 @@
 import { useMutation, useQuery, keepPreviousData } from '@tanstack/react-query'
 import { useQueryClient } from '@tanstack/react-query'
-import { api, rawRequest, unwrap } from '../../shared/api/client'
+import { api, unwrap } from '../../shared/api/client'
 import { qk, type AlertFilters } from '../../shared/lib/query-keys'
-import type { Alert } from '../../shared/api/types'
+import type { Alert, SuppressSuggestionRequest } from '../../shared/api/types'
 import { toast } from '../../shared/ui/toast'
 
 /** 告警列表（URL filters 直接进 key，§4.2「URL 即状态」） */
@@ -127,16 +127,17 @@ export function useConvertAlert() {
   })
 }
 
-/** 抑制建议提交（降噪反馈池）。端点为 [ASSUMPTION]（契约待补），经 rawRequest 逃生通道调用。 */
+/** 抑制建议提交（降噪反馈池；契约 /alerts/{id}/suppress-suggestion） */
 export function useSuppressSuggestion() {
   const invalidate = useInvalidates()
   return useMutation({
-    mutationFn: async ({ id, body }: { id: number; body: { reason: string; note?: string } }) =>
-      rawRequest<{ accepted: boolean; alert_id: number }>(
-        'POST',
-        `/alerts/${id}/suppress-suggestion`,
+    mutationFn: async ({ id, body }: { id: number; body: SuppressSuggestionRequest }) => {
+      const res = await api.POST('/alerts/{id}/suppress-suggestion', {
+        params: { path: { id } },
         body,
-      ),
+      })
+      return unwrap(res)
+    },
     onSuccess: () => {
       invalidate()
       toast.show({

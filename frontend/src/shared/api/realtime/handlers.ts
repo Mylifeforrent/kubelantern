@@ -17,15 +17,17 @@ export function planInvalidations(msg: RealtimeMessage): Invalidation[] {
       return [
         qk.alerts.list({}), // 前缀匹配所有 filters 组合
         qk.alerts.detail(msg.payload.resource_id),
+        ['nav-badge'],
       ]
     case 'incident.timeline.updated':
       return [
         qk.incidents.timeline(msg.payload.resource_id),
         qk.incidents.detail(msg.payload.resource_id),
         qk.incidents.list(),
+        ['nav-badge'],
       ]
     case 'ai_task.updated':
-      return [qk.aiTasks.list(), qk.aiTasks.detail(msg.payload.resource_id)]
+      return [qk.aiTasks.list(), qk.aiTasks.detail(msg.payload.resource_id), ['nav-badge']]
     default:
       return []
   }

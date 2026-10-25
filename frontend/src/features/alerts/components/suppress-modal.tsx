@@ -1,14 +1,15 @@
 /** 抑制建议弹窗（告警处置流：误报走抑制建议入降噪反馈池）。
- *  三原因单选 + 补充说明；端点为 [ASSUMPTION]（P0 契约评审补录）。 */
+ *  三原因单选 + 补充说明；原因值域以契约为准（SuppressSuggestionReason）。 */
 import { useState, type JSX } from 'react'
 import { useSearchParams } from 'react-router'
 import { Modal } from '../../../shared/ui/overlays'
 import { Button } from '../../../shared/ui/button'
 import { RadioCards, Label, Textarea } from '../../../shared/ui/inputs'
 import { Icon } from '../../../shared/ui/icon'
+import type { SuppressSuggestionReason } from '../../../shared/api/types'
 import { useSuppressSuggestion } from '../api'
 
-const REASONS = [
+const REASONS: { value: SuppressSuggestionReason; label: string; description: string }[] = [
   {
     value: 'false_positive',
     label: '误报',
@@ -23,7 +24,7 @@ const REASONS = [
 ]
 
 export function SuppressModal({ alertId }: { alertId: number }): JSX.Element | null {
-  const [reason, setReason] = useState('')
+  const [reason, setReason] = useState<SuppressSuggestionReason | ''>('')
   const [note, setNote] = useState('')
   const [params, setParams] = useSearchParams()
   const mutate = useSuppressSuggestion()
@@ -52,12 +53,13 @@ export function SuppressModal({ alertId }: { alertId: number }): JSX.Element | n
           <Button
             variant="primary"
             disabled={!reason || mutate.isPending}
-            onClick={() =>
+            onClick={() => {
+              if (!reason) return
               mutate.mutate(
                 { id: alertId, body: { reason, note: note || undefined } },
                 { onSuccess: close },
               )
-            }
+            }}
           >
             提交建议
           </Button>
@@ -67,7 +69,7 @@ export function SuppressModal({ alertId }: { alertId: number }): JSX.Element | n
       <RadioCards
         name="suppress-reason"
         value={reason}
-        onChange={setReason}
+        onChange={(v) => setReason(v as SuppressSuggestionReason)}
         options={REASONS}
         ariaLabel="抑制原因"
       />
@@ -76,6 +78,7 @@ export function SuppressModal({ alertId }: { alertId: number }): JSX.Element | n
         <Textarea
           id="suppress-note"
           rows={3}
+          maxLength={500}
           value={note}
           onChange={(e) => setNote(e.target.value)}
           placeholder="补充上下文，帮助规则调优复核（例如关联的变更单）"

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
-
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
 
@@ -41,18 +39,12 @@ async def subscribe_realtime_stream(
             heartbeat_seconds=settings.sse_heartbeat_seconds,
         )
         try:
-            while True:
+            # hub 自身以 heartbeat_seconds 阻塞轮询并产出 ": ping"；外层不能再套 wait_for，
+            # 否则超时会取消 __anext__ 并把异步生成器关闭，导致连接每 15s 被服务端断开。
+            async for frame in generator:
                 if await request.is_disconnected():
                     break
-                try:
-                    frame = await asyncio.wait_for(
-                        generator.__anext__(), timeout=settings.sse_heartbeat_seconds
-                    )
-                    yield frame
-                except asyncio.TimeoutError:
-                    yield ": ping\n\n"
-                except StopAsyncIteration:
-                    break
+                yield frame
         finally:
             await generator.aclose()
 

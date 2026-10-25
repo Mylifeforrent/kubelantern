@@ -114,7 +114,7 @@ function useNavBadges(): Record<string, number> {
     queryKey: ['nav-badge', 'ai-pending'],
     queryFn: async () => {
       const res = await api.GET('/ai/tasks', {
-        params: { query: { pending_approval: 'true', limit: 1 } },
+        params: { query: { status: 'pending_approval', limit: 1 } },
       })
       return res.data?.total ?? 0
     },

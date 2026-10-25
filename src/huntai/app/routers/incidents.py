@@ -19,6 +19,7 @@ from huntai.domains.incidents.schemas import (
     IncidentCancelRequest,
     IncidentCreateRequest,
     IncidentDetailResponse,
+    IncidentNoteCreateRequest,
     IncidentPage,
     IncidentResponse,
     PostmortemActionItemResponse,
@@ -28,6 +29,7 @@ from huntai.domains.incidents.schemas import (
     StatusPageEntryPage,
     StatusPageEntryResponse,
     StatusPageUpdateRequest,
+    StatusPageUpdateResponse,
 )
 
 router = APIRouter()
@@ -181,6 +183,27 @@ async def get_incident(
     return IncidentDetailResponse(**base.model_dump(), **detail)
 
 
+@router.post(
+    "/incidents/{incident_id}/notes", response_model=IncidentResponse, status_code=201
+)
+async def add_incident_note(
+    request: Request,
+    incident_id: int,
+    payload: IncidentNoteCreateRequest,
+    scope: TeamScope | None = Depends(require_permission("incidents", "transition")),
+    principal: Principal = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """人工处理记录（FR-32）：写 audit_logs 并由详情时间线派生 manual_note 节点。"""
+    incident = await repo.get_incident(session, incident_id)
+    _assert_visible(incident, scope)
+    incident = await service.add_manual_note(
+        session, incident_id, payload.note, actor_id=principal.user_id,
+        publish=_publish(request),
+    )
+    return _incident_response(incident)
+
+
 async def _transition(request, incident_id: int, action: str, principal, scope, session, body=None):
     incident = await service.transition(
         session, incident_id, action, actor_id=principal.user_id,
@@ -255,15 +278,19 @@ async def sync_incident_status_page(
     return _entry_response(entry)
 
 
-@router.post("/incidents/{incident_id}/status-page/undo", status_code=204)
+@router.post(
+    "/incidents/{incident_id}/status-page/undo", response_model=StatusPageEntryResponse
+)
 async def undo_incident_status_page(
     incident_id: int,
     _scope: TeamScope | None = Depends(require_permission("incidents", "status_page")),
     principal: Principal = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
-    await service.undo_status_page(session, incident_id, actor_id=principal.user_id)
-    return Response(status_code=http_status.HTTP_204_NO_CONTENT)
+    entry = await service.undo_status_page(session, incident_id, actor_id=principal.user_id)
+    if entry is None:
+        raise not_found("status_page_entries", incident_id)
+    return _entry_response(entry, updates=await repo.entry_updates(session, entry.id))
 
 
 @router.post("/incidents/{incident_id}/ai-investigation", status_code=201)
@@ -315,9 +342,19 @@ async def get_incident_postmortem(
     session: AsyncSession = Depends(get_session),
 ):
     postmortem = await service.get_or_template_postmortem(session, incident_id)
+    items = await repo.action_items(session, postmortem.id) if postmortem.id else []
     return PostmortemResponse(
         id=postmortem.id, incident_id=postmortem.incident_id, timeline=postmortem.timeline,
-        root_cause=postmortem.root_cause, action_items=[], created_by=postmortem.created_by,
+        root_cause=postmortem.root_cause,
+        action_items=[
+            PostmortemActionItemResponse(
+                id=item.id, content=item.content, owner_id=item.owner_id,
+                due_date=str(item.due_date) if item.due_date else None,
+                status=item.status, created_at=item.created_at, updated_at=item.updated_at,
+            )
+            for item in items
+        ],
+        created_by=postmortem.created_by,
         created_at=postmortem.created_at, updated_at=postmortem.updated_at,
     )
 
@@ -352,10 +389,24 @@ async def update_incident_postmortem(
 # ---------- 状态页条目 ----------
 
 
-def _entry_response(e) -> StatusPageEntryResponse:
+def _entry_response(e, updates=None) -> StatusPageEntryResponse:
     return StatusPageEntryResponse(
         id=e.id, incident_id=e.incident_id, title=e.title, visibility=e.visibility,
-        service_status=e.service_status, created_at=e.created_at, updated_at=e.updated_at,
+        service_status=e.service_status,
+        updates=(
+            [
+                StatusPageUpdateResponse(
+                    id=u.id, entry_id=u.entry_id, message=u.message,
+                    status_snapshot=u.status_snapshot, posted_by=u.posted_by,
+                    posted_at=u.posted_at, is_revoked=u.is_revoked,
+                    revoked_at=u.revoked_at, revoked_by=u.revoked_by,
+                )
+                for u in updates
+            ]
+            if updates is not None
+            else None
+        ),
+        created_at=e.created_at, updated_at=e.updated_at,
     )
 
 
@@ -410,7 +461,7 @@ async def get_status_page_entry(
         raise not_found("status_page_entries", entry_id)
     if "viewer" in principal.roles and "admin" not in principal.roles and entry.visibility != "public":
         raise not_found("status_page_entries", entry_id)
-    return _entry_response(entry)
+    return _entry_response(entry, updates=await repo.entry_updates(session, entry.id))
 
 
 @router.put("/status-page/entries/{entry_id}", response_model=StatusPageEntryResponse, tags=["status-page"], dependencies=[Depends(require_permission("status_page", "write"))])

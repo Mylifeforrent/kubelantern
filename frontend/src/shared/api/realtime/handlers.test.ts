@@ -44,7 +44,7 @@ describe('SSE 事件 → 失效计划（纯函数）', () => {
       planInvalidations(msg('ai_task.updated', 403)),
       planInvalidations(msg('ai_task.updated', 403)),
     ])
-    expect(merged).toHaveLength(2)
+    expect(merged).toHaveLength(3)
   })
 })
 

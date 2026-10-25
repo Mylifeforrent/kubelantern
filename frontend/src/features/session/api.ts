@@ -1,4 +1,4 @@
-import { api, rawRequest, unwrap } from '../../shared/api/client'
+import { api, unwrap } from '../../shared/api/client'
 import { tokenStore } from '../../shared/api/auth'
 import type { User } from '../../shared/api/types'
 import { useSessionStore } from './session-store'
@@ -18,11 +18,12 @@ export async function login(username: string, loginPass: string): Promise<void> 
   await refreshSession()
 }
 
-/** 当前会话用户：GET /users/me [ASSUMPTION]（契约草案未定义，随认证 [TBD-INFRA] 落地后迁回类型化 client） */
+/** 当前会话用户：GET /users/me（契约已补录；认证方式 [TBD-INFRA]） */
 export async function refreshSession(): Promise<User | null> {
   if (!tokenStore.get()) return null
   try {
-    const user = await rawRequest<User>('GET', '/users/me')
+    const res = await api.GET('/users/me')
+    const user = unwrap<User>(res)
     useSessionStore.getState().setUser(user)
     return user
   } catch {

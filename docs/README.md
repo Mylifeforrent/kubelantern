@@ -12,7 +12,7 @@
 | `02-business-design/` | 业务设计：业务范围、角色、领域模型、交互链路、业务规则 | ✅ 已有内容 |
 | `03-tech-design/` | 技术设计：系统架构（HLD）、模块详细设计（LLD）、架构决策记录（ADR） | ✅ 已有内容 |
 | `04-api/` | API 契约（以 OpenAPI spec 为单一事实源，文档只做链接与说明） | ✅ 已有内容 |
-| `05-qa/` | 测试计划、用例、测试报告 | 📋 规划中 |
+| `05-qa/` | 测试计划、用例、测试报告 | ✅ 已有内容 |
 | `06-release/` | 发布计划、变更记录、回滚预案 | 📋 规划中 |
 | `07-runbooks/` | 运维手册与应急处置 SOP（`runbook-writer` agent 输出目录） | 📋 规划中 |
 | `08-postmortems/` | 事故复盘，一篇一事，命名 `<日期>-<事件名>.md`（`runbook-writer` agent 输出目录） | 📋 规划中 |
@@ -33,10 +33,11 @@
 | `03-tech-design/03-frontend-design.md` | 前端设计与技术栈 | accepted | 2026-10-24 |
 | `03-tech-design/04-backend-design.md` | 后端设计与技术栈 | accepted | 2026-10-24 |
 | `03-tech-design/05-fe-be-boundary.md` | 前后端开发边界 | accepted | 2026-10-24 |
-| `04-api/openapi.yaml` | API 契约（OpenAPI 3.1，阶段一临时单一事实源，文件名序号例外见其 README §2.1） | accepted | 2026-10-24 |
+| `04-api/openapi.yaml` | API 契约（OpenAPI 3.1，阶段一临时单一事实源，文件名序号例外见其 README §2.1） | accepted | 2026-10-25 |
 | `02-business-design/04-hifi-design-spec.md` | 高保真设计规范（自可点击原型提取的设计系统） | accepted | 2026-10-24 |
-| `04-api/README.md` | API 契约说明（治理、端点总览、约定速览、验证方法） | accepted | 2026-10-24 |
+| `04-api/README.md` | API 契约说明（治理、端点总览、约定速览、验证方法） | accepted | 2026-10-25 |
 | `02-business-design/05-prd.md` | 产品需求文档（PRD）：产品全貌汇总与开放问题总清单 | accepted | 2026-10-24 |
+| `05-qa/01-fe-be-integration-report.md` | 前后端联调报告（页面/端点矩阵、缺陷修复、契约补录、遗留问题） | accepted | 2026-10-25 |
 
 ## 3. 命名与编号规范
 

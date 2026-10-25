@@ -42,6 +42,7 @@
 | 认证 | POST | /auth/token | 登录换取访问令牌（占位 `[TBD-INFRA]`） | P0 | 公开 |
 | 用户 | GET | /users | 用户列表 | P0 | admin |
 | 用户 | POST | /users | 创建用户（含角色授予） | P0 | admin |
+| 用户 | GET | /users/me | 当前会话用户（联调补录） | P0 | 全部角色 |
 | 用户 | GET | /users/{id} | 用户详情 | P0 | admin |
 | 用户 | PUT | /users/{id} | 更新用户 / 停用 | P0 | admin |
 | 角色 | GET | /roles | 角色与权限矩阵列表 | P0 | admin |
@@ -61,6 +62,7 @@
 | 告警 | GET | /alerts/{id} | 告警详情（payload/富化/降噪归因） | P0 | admin, sre, oncall_manager, developer(T) |
 | 告警 | POST | /alerts/{id}/ack | 认领告警（Ack）`[CONFLICT-C2]` | P0 | admin, sre, developer(T) |
 | 告警 | POST | /alerts/{id}/close | 关闭告警 | P0 | admin, sre |
+| 告警 | POST | /alerts/{id}/suppress-suggestion | 提交误报抑制建议（联调补录） | P0 | admin, sre, developer(T) |
 | 告警 | POST | /alerts/{id}/convert-to-incident | 一键转事件（人工立项） | P2 | admin, sre, developer(T) |
 | 告警 | GET | /alerts/{id}/explanations | 告警 AI 解释 | P1 | admin, sre, developer(T) |
 | 富化规则 | GET | /enrichment-rules | 富化规则列表 | P0 | admin, sre |
@@ -86,6 +88,7 @@
 | 事件 | POST | /incidents/{id}/resolve | 根因恢复 | P2 | admin, sre, developer(T) |
 | 事件 | POST | /incidents/{id}/close | 关闭事件 | P2 | admin, sre, developer(T) |
 | 事件 | POST | /incidents/{id}/cancel | 误报关闭（原因必填） | P2 | admin, sre, developer(T) |
+| 事件 | POST | /incidents/{id}/notes | 追加人工处理记录（FR-32，联调补录） | P2 | admin, sre, developer(T) |
 | 事件 | POST | /incidents/{id}/status-page/sync | 同步状态页（BR-06） | P2 | admin, sre |
 | 事件 | POST | /incidents/{id}/status-page/undo | 撤回状态页同步（BR-06） | P2 | admin, sre |
 | 事件 | POST | /incidents/{id}/ai-investigation | 发起 Agent 调查（A2，概要） | P3 | admin, sre |
@@ -140,7 +143,9 @@
 | 实时 | GET | /realtime/stream | SSE 事件流（Last-Event-ID 恢复）`[CONFLICT-C4]` | P0 | 全部角色（按 scope 过滤） |
 | 审计 | GET | /audit-logs | 审计日志查询（只读，BR-10） | P0 | admin |
 
-统计：**67 条路径 / 100 个操作**；分期计数 P0=46、P1=7、P2=39、P3=8（P3 为概要级）。
+统计：**70 条路径 / 103 个操作**；分期计数 P0=48、P1=7、P2=40、P3=8（P3 为概要级）。
+
+> 联调补录（2026-10-25）：`GET /users/me`、`POST /alerts/{id}/suppress-suggestion`、`POST /incidents/{id}/notes` 三个前端已消费端点回写草案；`GET /alerts` 增加 `q` 搜索参数。补录不改变既有枚举值域与状态机。
 
 ## 4. 约定速览（细节以 yaml 为准）
 
@@ -153,7 +158,8 @@
 | 字段命名 | JSON 字段 snake_case，前端不做 camelCase 转换 | 05-fe-be-boundary §2.4 |
 | 枚举 | 值域唯一来源 `01-data-model.md` §3 枚举字典（加粗状态机枚举禁止增删改）；schema enum / 前端 zod / mock 三者同源 | 01-data-model §3 |
 | webhook 202 | 落盘即应答（先落库/队列再处理，平台故障不丢告警）：202 + `{alert_id, merged}`；同指纹活跃告警合并计数不产生新行 | 04-backend-design §3.2.1、非功能 §8 |
-| SSE | `text/event-stream`；事件类型 `alert.updated` / `incident.timeline.updated` / `ai_task.updated`（草案定义 `[ASSUMPTION]`）；`Last-Event-ID` 断连恢复；通道最终确认 `[TBD-FE]`（ADR-0006） | 04-backend-design §5 |
+| 检索 | `GET /alerts?q=` 对 `title` / `fingerprint` 做模糊匹配（工作台搜索与顶栏全局搜索入口；联调已验证） | 03-frontend-design §4.2、联调报告 |
+| SSE | `text/event-stream`；事件类型 `alert.updated` / `incident.timeline.updated` / `ai_task.updated`（联调已验证）；载荷最小化 `{resource, resource_id, team, occurred_at}`；帧格式 `id` + `event` + `data`；`Last-Event-ID` 断连恢复；心跳为 SSE comment（默认 15s） | 04-backend-design §5、联调报告 |
 | 软删 | 配置类资源 DELETE 为软删（deleted_at，D-7）；audit_logs / ai_call_logs / notification_records 只追加，无修改删除路径 | 01-data-model D-6/D-7 |
 
 ## 5. 冲突登记（[CONFLICT]，待评审裁决）
@@ -192,7 +198,7 @@ python3 .zcode/scripts/secret_scan.py path docs/04-api/README.md
 |---|---|---|
 | `[TBD-INFRA]` | 认证方式（决定 /auth/token 形态、bearerAuth 实现与 SSE 认证手段） | 基础设施负责人 / P0 部署设计 |
 | `[TBD-INFRA]` | credentials 资源端点未在本草案覆盖（M0 示意清单含「credentials 仅引用元数据」，05-fe-be-boundary §4）；secret_ref 形态定后补端点或并入集群/Provider 资源 | 基础设施负责人 + 全栈 / P0 工程化 |
-| `[TBD-FE]` | SSE 通道最终确认（ADR-0006）；前端 TS client 是否由 spec 自动生成 | 前端 / P0 技术设计与联调前 |
-| `[TBD-BIZ]` | 状态页可见性默认值、升级链各级超时与渠道组合、驳回原因英译、通知渠道组合 | 业务负责人 / P2 设计前 |
+| `[TBD-FE]` | SSE 通道最终确认（ADR-0006）；当前按 SSE 实现并已联调验证，若后续改 WebSocket 仅替换前端实现类。前端 TS client 已由 spec 自动生成 | 前端 / P0 技术设计 |
+| `[TBD-BIZ]` | 状态页可见性默认值、升级链各级超时与渠道组合、驳回原因英译、通知渠道组合；抑制建议的规则调优闭环（当前仅 audit 留痕） | 业务负责人 / P2 设计前 |
 | `[TBD-UX]` | 告警降噪归因展示方式（影响告警详情归因字段结构） | UX / P0 前端设计前 |
-| `[ASSUMPTION]` | 权限矩阵未单列的读写收敛（富化/关联规则 admin+sre、用户列表 admin、通知记录可见角色、集群列表 sre 可见性、developer 读规则库）；告警级 AI 解释与 ai_explanations(finding_id) 的存储映射；webhook provider_key 语义与 Provider 令牌方案；事件时间线/升级摘要的派生结构；错误码清单；SSE 事件命名 | 见 yaml 内逐条标注的验证方式，随对应阶段详设评审收敛 |
+| `[ASSUMPTION]` | 权限矩阵未单列的读写收敛（富化/关联规则 admin+sre、用户列表 admin、通知记录可见角色、集群列表 sre 可见性、developer 读规则库）；告警级 AI 解释与 ai_explanations(finding_id) 的存储映射；webhook provider_key 语义与 Provider 令牌方案；事件时间线/升级摘要的派生结构；错误码清单 | 见 yaml 内逐条标注的验证方式，随对应阶段详设评审收敛 |

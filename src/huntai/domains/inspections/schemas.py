@@ -49,6 +49,7 @@ class InspectionPolicyResponse(BaseSchema):
     name: str
     schedule: str
     ai_explain_level: str
+    rule_ids: list[int] = []
     enabled: bool
     created_at: UtcDateTime
     updated_at: UtcDateTime

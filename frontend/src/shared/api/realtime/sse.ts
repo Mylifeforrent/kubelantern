@@ -81,7 +81,11 @@ export function createSseClient(baseUrl: string): RealtimeClient {
   }
 
   return {
-    connect: open,
+    connect() {
+      // 允许卸载/重挂载（React StrictMode 双执行、登录后重连）再次建立连接
+      closedByUser = false
+      open()
+    },
     disconnect() {
       closedByUser = true
       ctrl?.abort()

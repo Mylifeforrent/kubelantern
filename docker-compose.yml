@@ -36,6 +36,8 @@ services:
       HUNTAI_REDIS_URL: redis://redis:6379/0
       HUNTAI_API_HOST: 0.0.0.0
       HUNTAI_API_PORT: 8000
+      # 演示集群只读凭证（根 .env 注入；未配置时探活降级为 disconnected）
+      HUNTAI_DEMO_CLUSTER_TOKEN: ${HUNTAI_DEMO_CLUSTER_TOKEN:-}
     ports:
       - "8000:8000"
     depends_on:
@@ -56,6 +58,8 @@ services:
     environment:
       HUNTAI_DATABASE_URL: postgresql+asyncpg://huntai:your-password@postgres:5432/huntai
       HUNTAI_REDIS_URL: redis://redis:6379/0
+      # 巡检 worker 探活/快照同样需要该凭证引用
+      HUNTAI_DEMO_CLUSTER_TOKEN: ${HUNTAI_DEMO_CLUSTER_TOKEN:-}
     depends_on:
       postgres:
         condition: service_healthy

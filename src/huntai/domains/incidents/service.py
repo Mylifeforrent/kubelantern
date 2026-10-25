@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from huntai.core.db import utcnow
@@ -277,6 +278,27 @@ async def transition(
     return incident
 
 
+async def add_manual_note(
+    session: AsyncSession, incident_id: int, note: str, *, actor_id: int, publish=None
+) -> Incident:
+    """人工处理记录（FR-32）：写入 audit_logs，详情时间线派生为 manual_note 节点。"""
+    incident = await repo.get_incident(session, incident_id)
+    if incident is None:
+        raise not_found("incidents", incident_id)
+    await record_audit(
+        session, action="incident.note", resource_type="incidents", resource_id=incident.id,
+        detail={"note": note}, actor_id=actor_id,
+    )
+    if publish is not None:
+        from huntai.realtime.hub import RealtimeEvent
+
+        await publish(
+            RealtimeEvent(topic="incidents", name="incident.timeline.updated",
+                          resource="incident", resource_id=incident.id, team=incident.team)
+        )
+    return incident
+
+
 # ---------- 详情（时间线派生） ----------
 
 
@@ -297,6 +319,27 @@ async def build_detail(session: AsyncSession, incident: Incident) -> dict[str, A
     for link in links:
         timeline.append({"occurred_at": link.linked_at, "kind": "status_changed",
                          "summary": f"关联告警 #{link.alert_id}"})
+    # 人工处理记录（FR-32）：以 audit_logs 为唯一存储，派生进时间线（不新增列/迁移）
+    from huntai.domains.iam.models import AuditLog
+
+    note_rows = (
+        await session.execute(
+            select(AuditLog)
+            .where(
+                AuditLog.action == "incident.note",
+                AuditLog.resource_type == "incidents",
+                AuditLog.resource_id == str(incident.id),
+            )
+            .order_by(AuditLog.id)
+        )
+    ).scalars().all()
+    for note in note_rows:
+        timeline.append({
+            "occurred_at": note.created_at,
+            "kind": "manual_note",
+            "summary": str((note.detail or {}).get("note", "")),
+            "actor_id": note.actor_user_id,
+        })
     timeline.sort(key=lambda item: item["occurred_at"])
     related = [
         {
@@ -350,7 +393,8 @@ async def sync_status_page(
 
 async def undo_status_page(
     session: AsyncSession, incident_id: int, *, actor_id: int
-) -> None:
+) -> StatusPageEntry | None:
+    """撤回最近同步：更新行置 is_revoked（留痕），条目保留（契约 /status-page/undo 返回条目）。"""
     incident = await repo.get_incident(session, incident_id)
     if incident is None:
         raise not_found("incidents", incident_id)
@@ -361,13 +405,13 @@ async def undo_status_page(
                 update.is_revoked = True
                 update.revoked_at = utcnow()
                 update.revoked_by = actor_id
-        await session.delete(entry)
-        await session.flush()
+                break
     incident.status_page_sync = False
     await record_audit(
         session, action="incident.status_page_undo", resource_type="incidents",
         resource_id=incident.id, detail={}, actor_id=actor_id,
     )
+    return entry
 
 
 # ---------- 复盘（L3） ----------
@@ -381,10 +425,12 @@ async def get_or_template_postmortem(session: AsyncSession, incident_id: int) ->
     if existing is not None:
         return existing
     detail = await build_detail(session, incident)
-    # 模板未持久化：返回零值行，PUT 时落库
+    # 模板未持久化：返回零值行，PUT 时落库；时间戳取当前时刻满足契约必填
+    stamp = utcnow()
     return Postmortem(
         id=0, incident_id=incident_id, timeline=detail["timeline"],
         root_cause="", created_by=incident.created_by or 0,
+        created_at=stamp, updated_at=stamp,
     )
 
 
