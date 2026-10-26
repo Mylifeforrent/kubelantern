@@ -1,0 +1,1361 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>KubeLantern 全功能自测手册</title>
+<style>
+  :root{
+    --bg:#f4f6f7;--card:#fefeff;--ink:#191a1e;--body:#222325;--tx2:#5a5a5b;--dim:#6e6e71;
+    --line:#e8edf0;--line2:#d8dcdf;--brand:#c53520;--brand-dark:#a51e16;--gold:#f2cc60;
+    --gold-ink:#93551c;--ai:#9009e4;--ai-dark:#8b12d6;--green:#0a8a54;--teal:#0779a4;--red:#c40f3a;
+    --code:#1f2227;--code-fg:#e7edf3;--r:14px;--shadow:0 1px 2px rgba(25,26,30,.04),0 14px 34px rgba(25,26,30,.055);
+    --side:296px;--font:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  }
+  *{box-sizing:border-box}html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--body);font:400 15px/1.72 var(--font);-webkit-font-smoothing:antialiased}
+  ::selection{background:rgba(197,53,32,.18)}a{color:var(--teal);text-decoration:none}a:hover{text-decoration:underline}
+  code,kbd,pre{font-family:var(--mono)}:focus-visible{outline:2px solid var(--ai);outline-offset:3px;border-radius:4px}
+  .skip{position:fixed;left:12px;top:-60px;z-index:999;background:var(--ink);color:#fff;padding:10px 14px;border-radius:8px;transition:top .15s}
+  .skip:focus{top:12px}.reading-progress{position:fixed;left:0;top:0;height:3px;width:0;background:linear-gradient(90deg,var(--brand),var(--gold),var(--ai));z-index:1000}
+  .side{position:fixed;inset:0 auto 0 0;width:var(--side);background:rgba(254,254,255,.97);border-right:1px solid var(--line);padding:20px 16px 28px;overflow-y:auto;backdrop-filter:blur(10px);z-index:20}
+  .brand{display:flex;align-items:center;gap:10px;margin-bottom:16px}.brand svg{width:34px;height:34px;flex:none}
+  .brand b{display:block;font-size:15px;color:var(--ink);letter-spacing:-.01em}.brand span{display:block;font-size:11px;color:var(--dim)}
+  .progress-card{border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:linear-gradient(135deg,rgba(197,53,32,.05),rgba(144,9,228,.04));margin-bottom:16px}
+  .progress-card .row{display:flex;align-items:baseline;justify-content:space-between;gap:8px}.progress-card b{font-size:12px;color:var(--ink)}.progress-card span{font-size:11px;color:var(--dim)}
+  .bar{height:6px;margin-top:7px;background:rgba(25,26,30,.08);border-radius:99px;overflow:hidden}.bar i{display:block;height:100%;width:0;border-radius:99px;background:linear-gradient(90deg,var(--brand),var(--gold));transition:width .25s}
+  .progress-card small{display:block;margin-top:6px;font-size:10.5px;color:var(--dim);line-height:1.5}
+  .nav-title{font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);margin:16px 4px 6px}
+  .side nav a{display:flex;gap:8px;align-items:baseline;padding:5px 8px;border-radius:8px;color:var(--tx2);font-size:12.5px;line-height:1.35;text-decoration:none;border-left:2px solid transparent}
+  .side nav a:hover{background:rgba(25,26,30,.04);color:var(--ink)}.side nav a.on{background:rgba(197,53,32,.075);color:var(--brand-dark);border-left-color:var(--brand);font-weight:600}
+  .side nav a em{font-style:normal;font-family:var(--mono);font-size:10px;color:var(--dim);min-width:20px}.side nav a.on em{color:var(--brand)}
+  .side-foot{margin-top:22px;border-top:1px solid var(--line);padding-top:12px;font-size:10.5px;color:var(--dim);line-height:1.6}
+  .side-foot code{background:rgba(25,26,30,.05);padding:1px 4px;border-radius:4px;font-size:10px}
+  main{margin-left:var(--side);padding:0 48px 80px}.wrap{max-width:1120px;margin:0 auto}
+  .hero{margin:0 -48px 30px;padding:56px 48px 42px;background:radial-gradient(900px 380px at 12% -10%,rgba(197,53,32,.13),transparent 60%),radial-gradient(760px 360px at 92% 0%,rgba(144,9,228,.12),transparent 58%),radial-gradient(600px 300px at 55% 110%,rgba(242,204,96,.16),transparent 65%),#fbfcfc;border-bottom:1px solid var(--line)}
+  .eyebrow{display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11px;letter-spacing:.11em;color:var(--brand-dark);text-transform:uppercase;margin-bottom:12px}
+  .eyebrow::before{content:"";width:22px;height:1px;background:var(--brand)}
+  h1{margin:0 0 12px;font-size:clamp(30px,4vw,46px);line-height:1.12;letter-spacing:-.035em;color:var(--ink)}h1 .accent{color:var(--brand)}
+  .lede{margin:0;max-width:850px;color:var(--tx2);font-size:15.5px;line-height:1.8}
+  .meta-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:20px}.pill{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line2);background:rgba(255,255,255,.72);padding:5px 10px;border-radius:99px;font-size:11.5px;color:var(--tx2)}.pill b{color:var(--ink);font-weight:600}
+  .hero-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}
+  .btn{display:inline-flex;align-items:center;gap:7px;padding:10px 14px;border-radius:10px;border:1px solid var(--line2);background:#fff;color:var(--ink);font-size:13px;font-weight:600;text-decoration:none;box-shadow:0 1px 2px rgba(25,26,30,.03)}
+  .btn:hover{text-decoration:none;border-color:#c6cacd;transform:translateY(-1px)}.btn.primary{background:var(--brand);border-color:var(--brand);color:#fff}.btn.primary:hover{background:var(--brand-dark)}
+  .btn.ai{background:rgba(144,9,228,.07);border-color:rgba(144,9,228,.24);color:var(--ai-dark)}
+  .kpi{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:18px 0 0}.kpi .k{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+  .kpi .k b{display:block;font-size:21px;line-height:1.2;color:var(--ink);letter-spacing:-.02em}.kpi .k span{display:block;font-size:10.5px;color:var(--dim);margin-top:3px}
+  section{scroll-margin-top:22px;margin:40px 0}section>h2{font-size:25px;line-height:1.25;letter-spacing:-.02em;color:var(--ink);margin:0 0 8px;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+  section>h2 .num{font-family:var(--mono);font-size:12px;color:var(--brand);border:1px solid rgba(197,53,32,.25);background:rgba(197,53,32,.06);padding:2px 7px;border-radius:6px;letter-spacing:.04em}
+  .sub{color:var(--tx2);margin:0 0 18px;max-width:900px}h3{font-size:18px;line-height:1.4;color:var(--ink);margin:28px 0 10px;letter-spacing:-.01em}h4{font-size:14.5px;color:var(--ink);margin:20px 0 8px}
+  p{margin:9px 0}ul,ol{padding-left:22px}li{margin:4px 0}strong{color:var(--ink)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:20px 22px;margin:14px 0;min-width:0}.card.tight{padding:15px 17px}
+  .grid{display:grid;gap:12px}.grid>*{min-width:0}.grid.two{grid-template-columns:repeat(2,minmax(0,1fr))}.grid.three{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .mini{font-size:12.5px;color:var(--tx2)}code{overflow-wrap:anywhere}
+  .mobile-nav{display:none}.dim{color:var(--dim)}.mono{font-family:var(--mono)}
+  .callout{border-radius:12px;padding:13px 15px 13px 44px;margin:14px 0;position:relative;font-size:13.5px;line-height:1.7;border:1px solid}
+  .callout::before{position:absolute;left:14px;top:11px;width:20px;height:20px;display:grid;place-items:center;border-radius:6px;font-size:11px;font-weight:700;color:#fff}
+  .callout b{display:block;color:var(--ink);margin-bottom:2px}
+  .callout.why{background:rgba(197,53,32,.045);border-color:rgba(197,53,32,.18)}.callout.why::before{content:"WHY";background:var(--brand);font-size:8px}
+  .callout.note{background:rgba(242,204,96,.13);border-color:rgba(147,85,28,.22)}.callout.note::before{content:"!";background:var(--gold-ink)}
+  .callout.verify{background:rgba(10,138,84,.055);border-color:rgba(10,138,84,.2)}.callout.verify::before{content:"✓";background:var(--green)}
+  .callout.boundary{background:rgba(144,9,228,.045);border-color:rgba(144,9,228,.2)}.callout.boundary::before{content:"P3";background:var(--ai);font-size:8px}
+  .callout.danger{background:rgba(196,15,58,.055);border-color:rgba(196,15,58,.2)}.callout.danger::before{content:"✕";background:var(--red)}
+  .table-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--card);margin:12px 0}
+  table{width:100%;border-collapse:collapse;font-size:12.8px}th,td{text-align:left;padding:9px 11px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:#f8fafb;color:var(--tx2);font-size:11.5px;font-weight:600;white-space:nowrap}tr:last-child td{border-bottom:0}
+  td code{background:rgba(25,26,30,.055);padding:1px 5px;border-radius:4px;font-size:11.5px}
+  .tag{display:inline-block;padding:1px 7px;border-radius:99px;font-size:10.5px;line-height:1.7;border:1px solid var(--line2);color:var(--tx2);background:#fff;white-space:nowrap}
+  .tag.ok{color:var(--green);border-color:rgba(10,138,84,.25);background:rgba(10,138,84,.06)}.tag.warn{color:var(--gold-ink);border-color:rgba(147,85,28,.25);background:rgba(242,204,96,.13)}
+  .tag.ai{color:var(--ai-dark);border-color:rgba(144,9,228,.25);background:rgba(144,9,228,.06)}.tag.bad{color:var(--red);border-color:rgba(196,15,58,.22);background:rgba(196,15,58,.055)}.tag.gray{color:var(--dim);background:#f4f6f7}
+  .steps{list-style:none;padding:0;margin:16px 0;counter-reset:step}.steps>li{position:relative;padding:0 0 18px 42px;margin:0;counter-increment:step}
+  .steps>li::before{content:counter(step,decimal-leading-zero);position:absolute;left:0;top:0;width:27px;height:27px;display:grid;place-items:center;border-radius:9px;background:rgba(197,53,32,.08);color:var(--brand-dark);font-family:var(--mono);font-size:11px;font-weight:700;border:1px solid rgba(197,53,32,.18)}
+  .steps>li::after{content:"";position:absolute;left:13px;top:33px;bottom:6px;width:1px;background:var(--line2)}.steps>li:last-child{padding-bottom:0}.steps>li:last-child::after{display:none}.steps b.step-t{display:block;color:var(--ink);margin-bottom:3px}
+  .code-block{position:relative;margin:12px 0;border-radius:12px;overflow:hidden;border:1px solid #2c3037;background:var(--code)}
+  .code-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 64px 7px 12px;background:#171a1f;border-bottom:1px solid #2c3037;color:#9da7b3;font-size:11px;font-family:var(--mono)}
+  .code-block pre{margin:0;padding:14px 15px;overflow-x:auto;color:var(--code-fg);font-size:12.5px;line-height:1.65}.code-block code{font-family:var(--mono)}.code-block:not(:has(.code-head)) pre{padding-top:38px}
+  .copy-btn{position:absolute;right:10px;top:6px;z-index:2;border:1px solid #3b414a;background:#262b32;color:#c7d1db;border-radius:7px;padding:3px 8px;font-size:10.5px;cursor:pointer}
+  .copy-btn:hover{background:#323842;color:#fff}.code-block:has(.code-head) .copy-btn{top:6px}
+  kbd{background:#fff;border:1px solid var(--line2);border-bottom-width:2px;border-radius:5px;padding:1px 5px;font-size:11.5px}
+  .flow-wrap{overflow-x:auto;padding:4px 2px 10px;margin:12px 0}.flow{display:flex;align-items:stretch;gap:7px;min-width:940px}
+  .flow .node{flex:1;min-width:104px;background:var(--card);border:1px solid var(--line2);border-radius:11px;padding:10px 11px;box-shadow:0 1px 2px rgba(25,26,30,.03)}
+  .flow .node b{display:block;font-size:12px;color:var(--ink)}.flow .node span{display:block;margin-top:3px;font-size:10.5px;color:var(--dim);line-height:1.45}
+  .flow .node.brand{border-color:rgba(197,53,32,.26);background:rgba(197,53,32,.035)}.flow .node.ai{border-color:rgba(144,9,228,.26);background:rgba(144,9,228,.04)}.flow .node.green{border-color:rgba(10,138,84,.26);background:rgba(10,138,84,.04)}
+  .flow .arrow{align-self:center;color:var(--dim);font-family:var(--mono);font-size:15px;flex:none}
+  .svg-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:14px;background:#fbfcfc;padding:8px;margin:14px 0}.svg-wrap svg{display:block;width:100%;height:auto;min-width:900px}
+  .checklist{display:grid;gap:8px;margin:12px 0}.checkitem{display:flex;align-items:flex-start;gap:10px;padding:9px 11px;border:1px solid var(--line);border-radius:10px;background:var(--card);font-size:13px}
+  .checkitem input{margin-top:4px;accent-color:var(--brand);width:15px;height:15px;flex:none}.checkitem label{flex:1;cursor:pointer}.checkitem small{display:block;color:var(--dim);font-size:11.5px;margin-top:2px}
+  .checkitem:has(input:checked){background:rgba(10,138,84,.04);border-color:rgba(10,138,84,.2)}.checkitem:has(input:checked) label{color:var(--tx2)}
+  details{border:1px solid var(--line);border-radius:12px;background:var(--card);margin:10px 0;overflow:hidden}
+  details>summary{cursor:pointer;padding:11px 14px;font-weight:600;font-size:13.5px;color:var(--ink);list-style:none;display:flex;align-items:center;gap:8px}
+  details>summary::-webkit-details-marker{display:none}details>summary::before{content:"+";font-family:var(--mono);color:var(--brand);font-weight:700}details[open]>summary::before{content:"−"}
+  details .body{padding:0 14px 14px;border-top:1px solid var(--line)}details .body>:first-child{margin-top:11px}
+  .principle{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:12px 0}
+  .principle .p{border:1px solid var(--line);border-radius:12px;padding:13px 14px;background:var(--card)}
+  .principle .p b{display:flex;align-items:center;gap:8px;color:var(--ink);font-size:13px}.principle .p b i{font-style:normal;width:21px;height:21px;display:grid;place-items:center;border-radius:7px;background:rgba(197,53,32,.08);color:var(--brand-dark);font-family:var(--mono);font-size:10px}
+  .principle .p p{margin:5px 0 0;font-size:12.2px;color:var(--tx2);line-height:1.62}
+  footer{margin-top:56px;padding-top:20px;border-top:1px solid var(--line);color:var(--dim);font-size:11.5px;line-height:1.8}
+  @media(max-width:1180px){:root{--side:258px}main{padding:0 30px 70px}.hero{margin:0 -30px 28px;padding:46px 30px 38px}}
+  @media(max-width:980px){.side{position:static;width:auto;border-right:0;border-bottom:1px solid var(--line);padding:14px 18px}.side nav,.side .nav-title{display:none}.mobile-nav{display:block;margin:0 0 10px}.mobile-nav summary{cursor:pointer;font-size:12.5px;font-weight:600;color:var(--ink);padding:8px 10px;border:1px solid var(--line);border-radius:9px;background:#fff}.mobile-links{display:grid;grid-template-columns:1fr 1fr;gap:2px 8px;padding:6px 0 2px}.mobile-links a{display:flex;gap:7px;align-items:baseline;padding:5px 7px;border-radius:7px;color:var(--tx2);font-size:12px;text-decoration:none}.mobile-links a:hover{background:rgba(25,26,30,.04);color:var(--ink)}.mobile-links em{font-style:normal;font-family:var(--mono);font-size:10px;color:var(--dim);min-width:18px}.side-foot{display:none}main{margin-left:0;padding:0 20px 60px}.hero{margin:0 -20px 24px;padding:34px 20px 30px}.grid.two,.grid.three,.principle{grid-template-columns:minmax(0,1fr)}.kpi{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  @media(max-width:560px){body{font-size:14px}.side nav{grid-template-columns:1fr}.kpi{grid-template-columns:1fr}h1{font-size:30px}}
+  @media print{body{background:#fff;font-size:10.5pt}.skip,.side,.reading-progress,.hero-actions,.copy-btn{display:none!important}main{margin:0;padding:0;max-width:none}.hero{margin:0 0 18px;padding:18px 0;background:none;border-bottom:2px solid #000}.card,.table-wrap,.svg-wrap,.flow-wrap,.callout,.code-block{box-shadow:none;break-inside:avoid}.code-block{background:#f6f8fa;border-color:#ccc}.code-block pre{color:#111}.code-head{background:#eee;color:#333}details:not([open])>.body{display:block}a{color:#000;text-decoration:underline}}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">跳到正文</a>
+<div class="reading-progress" id="readingProgress" aria-hidden="true"></div>
+
+<aside class="side">
+  <div class="brand">
+    <svg viewBox="0 0 64 64" role="img" aria-label="KubeLantern logo">
+      <defs><linearGradient id="lg" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#F0643C"/><stop offset=".52" stop-color="#C53520"/><stop offset="1" stop-color="#8B1B0F"/></linearGradient></defs>
+      <rect width="64" height="64" rx="15" fill="url(#lg)"/>
+      <path d="M25.5 14.5h13" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/>
+      <path d="M27.8 14.5v-1.6a4.2 4.2 0 0 1 8.4 0v1.6" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/>
+      <path d="M22.3 17.8h19.4l-2.1 4.8H24.4z" fill="#fff"/>
+      <path d="M24.4 22.6h15.2l-1.7 20.7a4.7 4.7 0 0 1-4.7 4.2h-2.4a4.7 4.7 0 0 1-4.7-4.2z" fill="#fff"/>
+      <path d="M27.7 26.2h8.6l-.9 15.1a2.35 2.35 0 0 1-2.35 2.2h-2.1a2.35 2.35 0 0 1-2.35-2.2z" fill="#8B1B0F"/>
+      <g stroke="#F2CC60" stroke-width="1.6" stroke-linecap="round"><circle cx="32" cy="35" r="4.8" fill="none"/><circle cx="32" cy="35" r="1.35" fill="#F2CC60" stroke="none"/><path d="M32 30.2v2.6M32 37.2v2.6M27.2 35h2.6M34.2 35h2.6M28.6 31.6l1.85 1.85M33.55 36.55l1.85 1.85M35.4 31.6l-1.85 1.85M30.45 36.55l-1.85 1.85"/></g>
+      <path d="M26.2 51.4h11.6" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/>
+    </svg>
+    <div><b>KubeLantern</b><span>全功能自测手册</span></div>
+  </div>
+  <div class="progress-card">
+    <div class="row"><b>自测进度</b><span id="progressText">0 / 10</span></div>
+    <div class="bar"><i id="progressBar"></i></div>
+    <small>勾选 §06 清单即可保存到本机浏览器；不会上传数据。</small>
+  </div>
+  <details class="mobile-nav">
+    <summary>目录 · 19 个章节</summary>
+    <div class="mobile-links" id="mobileLinks"></div>
+  </details>
+  <div class="nav-title">开始之前</div>
+  <nav><a href="#s0"><em>00</em>读前须知</a><a href="#s1"><em>01</em>系统全景与设计原理</a></nav>
+  <div class="nav-title">跑起来</div>
+  <nav><a href="#s2"><em>02</em>环境准备</a><a href="#s3"><em>03</em>启动 kind 集群</a><a href="#s4"><em>04</em>构建与部署</a><a href="#s5"><em>05</em>一键验收</a><a href="#s6"><em>06</em>手工测试路线</a></nav>
+  <div class="nav-title">逐项自测</div>
+  <nav><a href="#s7"><em>07</em>故障注入与报错</a><a href="#s8"><em>08</em>告警接入与降噪</a><a href="#s9"><em>09</em>巡检与 BR-09</a><a href="#s10"><em>10</em>候选与事件闭环</a><a href="#s11"><em>11</em>AI 使用与治理</a><a href="#s12"><em>12</em>值班与升级</a><a href="#s13"><em>13</em>权限、审计与后台</a><a href="#s14"><em>14</em>演示业务与实时通道</a></nav>
+  <div class="nav-title">收尾</div>
+  <nav><a href="#s15"><em>15</em>排障速查</a><a href="#s16"><em>16</em>清理与重建</a><a href="#s17"><em>17</em>功能边界与验收口径</a><a href="#s18"><em>18</em>API 速查</a></nav>
+  <div class="side-foot">版本 1.0 · 2026-10-26<br />适用：本地 kind 演示环境<br />关键命令已在本机环境核对。<br /><code>docs/06-release/05-self-test-handbook.html</code></div>
+</aside>
+
+<main id="main">
+<header class="hero"><div class="wrap">
+  <div class="eyebrow">KubeLantern · Self-test handbook</div>
+  <h1>从零跑通一套<br /><span class="accent">可造故障、可验收</span>的 SRE 平台</h1>
+  <p class="lede">这份手册不只告诉你“敲什么命令”，还会解释每一步为什么存在：为什么是 3 节点 kind、为什么告警要先落库再入队、为什么巡检只读、为什么 AI 默认不出域、为什么 NoAI 也是设计内行为。照着做，你会在本地得到一套可重复、可观测、可清理的 KubeLantern 演示环境，并逐项验证告警、巡检、事件、AI、值班与权限。</p>
+  <div class="meta-row"><span class="pill"><b>环境</b> macOS / Linux + Docker Desktop</span><span class="pill"><b>集群</b> kind 3 节点 · K8s v1.37</span><span class="pill"><b>自动验收</b> 14 项</span><span class="pill"><b>手工全量</b> 60–90 分钟</span><span class="pill"><b>技术栈</b> FastAPI · React 19 · PostgreSQL · Redis</span></div>
+  <div class="hero-actions"><a class="btn primary" href="#s2">开始准备环境 →</a><a class="btn" href="#s1">先看架构与原理</a><a class="btn ai" href="#s11">直接看 AI 怎么测</a><a class="btn" href="#s18">API 速查</a></div>
+  <div class="kpi"><div class="k"><b>5</b><span>类真实 K8s 故障注入</span></div><div class="k"><b>7</b><span>条内置巡检规则</span></div><div class="k"><b>5</b><span>个 RBAC 角色</span></div><div class="k"><b>5</b><span>条独立 worker 队列</span></div></div>
+</div></header>
+
+<div class="wrap">
+
+<section id="s0">
+  <h2><span class="num">00</span>读前须知：这份手册怎么用</h2>
+  <p class="sub">先把“要测什么、测到什么程度、哪些是当前实现边界”说清楚，避免把设计内降级误判成故障。</p>
+  <div class="grid two">
+    <div class="card tight"><h4>两条路线，按时间选</h4><p class="mini"><strong>路线 A · 30 分钟快速验收：</strong>环境准备 → 3 节点集群 → 部署 → 一键验收。适合第一次跑通、确认环境没坏。</p><p class="mini"><strong>路线 B · 90 分钟全功能自测：</strong>在 A 的基础上，逐项手工触发故障、告警、巡检、候选、事件、AI、值班与 RBAC。适合交付前自测或演示彩排。</p></div>
+    <div class="card tight"><h4>你需要准备什么</h4><ul class="mini"><li>Docker Desktop 已启动，建议 <strong>8 核 / 12–16 GB</strong> 内存。</li><li>宿主机 <code>8080</code> 与 <code>18081</code> 端口空闲。</li><li>仓库根目录有一份可编辑的 <code>.env</code>（只用于外部 AI key 等本地配置）。</li><li>不要使用生产集群、真实凭据或真实业务数据。</li></ul></div>
+  </div>
+  <h3>术语表：看到这些词不要慌</h3>
+  <div class="table-wrap"><table><thead><tr><th>术语</th><th>含义</th><th>在哪里看到</th></tr></thead><tbody>
+    <tr><td><strong>Provider</strong></td><td>告警源适配器。内置 <code>demo-alertmanager</code>（webhook）与 <code>huntai-inspection</code>（巡检转告警）。</td><td>管理后台</td></tr>
+    <tr><td><strong>Fingerprint</strong></td><td>由 Provider 指定标签字段计算的 SHA-256 指纹；同指纹重复上报只合并计数。</td><td>告警列表</td></tr>
+    <tr><td><strong>Alert</strong></td><td>一条告警，经历 received → enriched → correlated/standalone → notified/resolved。</td><td>告警工作台</td></tr>
+    <tr><td><strong>Finding</strong></td><td>巡检规则在某个资源上的确定性发现；warning/critical 会按 BR-09 转告警。</td><td>巡检看板</td></tr>
+    <tr><td><strong>Candidate</strong></td><td>候选事件，必须人工确认才立项（BR-04）。</td><td>候选事件</td></tr>
+    <tr><td><strong>Incident</strong></td><td>事件，6 态状态机；误报走 cancelled。</td><td>事件响应</td></tr>
+    <tr><td><strong>AITask</strong></td><td>一次 AI 任务（explain / investigate / workflow_gen），带预算、状态与调用日志。</td><td>AI 任务中心</td></tr>
+    <tr><td><strong>NoAI</strong></td><td>模型不可用或熔断开路时的优雅降级：任务失败并留痕，不阻塞确定性主链路。</td><td>AI 任务中心</td></tr>
+    <tr><td><strong>SSE</strong></td><td>Server-Sent Events，单向实时推送。</td><td>告警工作台</td></tr>
+    <tr><td><strong>BR-xx</strong></td><td>业务规则编号；详细定义见 <code>docs/02-business-design/01-domain-model.md</code>。</td><td>各处置动作旁</td></tr>
+  </tbody></table></div>
+  <div class="callout note"><b>口令与凭据：手册里全是占位符</b>演示环境的登录口令是 Helm values 里的 <code>your-demo-auth-password</code>，不是真实凭据；DeepSeek key 只允许放在仓库根 <code>.env</code> 或集群 Secret 中。不要把 <code>.env</code>、kubeconfig、token 或任何真实 key 提交到仓库，也不要把 Secret 内容打印到终端或工单里。</div>
+  <div class="callout boundary"><b>“所有功能”的边界</b>本手册覆盖当前仓库可运行的 P0–P2 主链路，以及 P3 薄层中已经暴露的 API。部分界面入口尚未接线（例如 Workflow 页面、AI 自动审批触发），手册会在对应章节明确标注“当前实现边界”，并给出可验证的替代路径。不要把“边界”当成“坏了”。</div>
+</section>
+
+<section id="s1">
+  <h2><span class="num">01</span>系统全景与设计原理</h2>
+  <p class="sub">先建立一张正确的心智地图：请求从哪来、落到哪、哪个组件负责降噪、哪个组件负责 AI 治理。</p>
+  <h3>1.1 部署全景：一台开发机上的 3 节点集群</h3>
+  <p>KubeLantern 的本地演示环境刻意做成“<strong>平台自己也住在 K8s 里</strong>”：平台、PostgreSQL、Redis、演示业务、故障资源都在同一个 kind 集群中。这样巡检连接器才能用真实的只读 ServiceAccount 访问集群，而不是对着一个假数据源做演示。</p>
+  <div class="svg-wrap" aria-label="KubeLantern 本地演示环境部署架构图">
+    <svg viewBox="0 0 1280 760" role="img" aria-labelledby="archTitle archDesc">
+      <title id="archTitle">KubeLantern 本地演示环境部署架构</title>
+      <desc id="archDesc">宿主机浏览器通过 8080 访问平台 Web，通过 18081 访问演示控制台；kind 集群内 huntai 命名空间运行 Web、API、5 类 worker、PostgreSQL、Redis 与只读 ServiceAccount；demo 命名空间运行 Java、Python、React 控制台、故障注入资源和告警上报 CronJob；AI worker 经 AI Gateway 访问本地或外部模型。</desc>
+      <defs>
+        <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#8a9199"/></marker>
+        <marker id="arBrand" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#c53520"/></marker>
+        <marker id="arAi" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#9009e4"/></marker>
+        <marker id="arGreen" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#0a8a54"/></marker>
+      </defs>
+      <rect x="12" y="12" width="1256" height="736" rx="20" fill="#fbfcfc" stroke="#e8edf0"/>
+      <text x="42" y="48" font-size="18" font-weight="700" fill="#191a1e">KubeLantern 本地演示环境</text>
+      <text x="42" y="68" font-size="11.5" fill="#6e6e71">一条命令构建、kind load 进节点、Helm 部署；无需镜像仓库</text>
+      <rect x="32" y="100" width="214" height="270" rx="14" fill="#fff" stroke="#d8dcdf"/>
+      <text x="50" y="128" font-size="13" font-weight="700" fill="#191a1e">宿主机 / 浏览器</text>
+      <rect x="50" y="146" width="178" height="54" rx="9" fill="#f4f6f7" stroke="#e8edf0"/><text x="62" y="167" font-size="11" font-weight="600" fill="#191a1e">:8080</text><text x="62" y="184" font-size="10" fill="#6e6e71">平台 Web + /api 同源代理</text>
+      <rect x="50" y="214" width="178" height="54" rx="9" fill="#f4f6f7" stroke="#e8edf0"/><text x="62" y="235" font-size="11" font-weight="600" fill="#191a1e">:18081</text><text x="62" y="252" font-size="10" fill="#6e6e71">演示业务控制台</text>
+      <text x="50" y="298" font-size="10.5" fill="#6e6e71">Docker Desktop</text><text x="50" y="316" font-size="10.5" fill="#6e6e71">建议 8 核 / 12–16 GB</text><text x="50" y="334" font-size="10.5" fill="#6e6e71">kind / kubectl / helm / python3</text>
+      <rect x="278" y="92" width="706" height="666" rx="16" fill="#f7f9fa" stroke="#c9d0d5" stroke-width="1.4"/>
+      <text x="300" y="120" font-size="13.5" font-weight="700" fill="#191a1e">kind 集群：huntai-sre</text><text x="300" y="137" font-size="10.5" fill="#6e6e71">1 control-plane + 2 worker = 3 个 Docker 容器</text>
+      <rect x="300" y="150" width="190" height="28" rx="7" fill="#fff" stroke="#d8dcdf"/><text x="312" y="168" font-size="10.5" fill="#5a5a5b">control-plane</text>
+      <rect x="502" y="150" width="190" height="28" rx="7" fill="#fff" stroke="#d8dcdf"/><text x="514" y="168" font-size="10.5" fill="#5a5a5b">worker</text>
+      <rect x="704" y="150" width="190" height="28" rx="7" fill="#fff" stroke="#d8dcdf"/><text x="716" y="168" font-size="10.5" fill="#5a5a5b">worker2</text>
+      <rect x="302" y="198" width="374" height="532" rx="14" fill="#fff" stroke="#e0e5e8"/><text x="318" y="223" font-size="12" font-weight="700" fill="#c53520">namespace: huntai</text>
+      <rect x="318" y="240" width="150" height="58" rx="9" fill="#fdf3f1" stroke="#e9b9b2"/><text x="330" y="262" font-size="11" font-weight="700" fill="#191a1e">huntai-web</text><text x="330" y="278" font-size="9.5" fill="#6e6e71">nginx · SPA · SSE 不缓冲</text>
+      <rect x="486" y="240" width="170" height="58" rx="9" fill="#fdf3f1" stroke="#e9b9b2"/><text x="498" y="262" font-size="11" font-weight="700" fill="#191a1e">huntai-api</text><text x="498" y="278" font-size="9.5" fill="#6e6e71">FastAPI · 认证 · 管道入口</text>
+      <rect x="318" y="322" width="338" height="126" rx="10" fill="#f8f5fd" stroke="#d9c4ec"/><text x="330" y="344" font-size="11" font-weight="700" fill="#191a1e">5 类 arq worker（同镜像多角色）</text>
+      <rect x="330" y="354" width="148" height="24" rx="6" fill="#fff" stroke="#e2d3f0"/><text x="338" y="370" font-size="9.5" fill="#5a5a5b">q-alert-pipeline</text>
+      <rect x="486" y="354" width="158" height="24" rx="6" fill="#fff" stroke="#e2d3f0"/><text x="494" y="370" font-size="9.5" fill="#5a5a5b">q-notification</text>
+      <rect x="330" y="384" width="148" height="24" rx="6" fill="#fff" stroke="#e2d3f0"/><text x="338" y="400" font-size="9.5" fill="#5a5a5b">q-escalation</text>
+      <rect x="486" y="384" width="158" height="24" rx="6" fill="#fff" stroke="#e2d3f0"/><text x="494" y="400" font-size="9.5" fill="#5a5a5b">q-inspection</text>
+      <rect x="330" y="414" width="148" height="24" rx="6" fill="#fff" stroke="#e2d3f0"/><text x="338" y="430" font-size="9.5" fill="#5a5a5b">q-ai + AI Gateway</text><text x="486" y="430" font-size="9" fill="#8b12d6">唯一模型出域口</text>
+      <rect x="318" y="478" width="150" height="58" rx="9" fill="#eef7f8" stroke="#b9dce4"/><text x="330" y="500" font-size="11" font-weight="700" fill="#191a1e">PostgreSQL 16</text><text x="330" y="516" font-size="9.5" fill="#6e6e71">业务状态唯一事实源</text>
+      <rect x="486" y="478" width="170" height="58" rx="9" fill="#eef7f8" stroke="#b9dce4"/><text x="498" y="500" font-size="11" font-weight="700" fill="#191a1e">Redis 7</text><text x="498" y="516" font-size="9.5" fill="#6e6e71">队列 · 推送 · 限流状态</text>
+      <rect x="318" y="570" width="338" height="54" rx="9" fill="#fff" stroke="#d8dcdf"/><text x="330" y="591" font-size="10.5" font-weight="700" fill="#191a1e">ServiceAccount: huntai-readonly</text><text x="330" y="607" font-size="9.5" fill="#6e6e71">只读 pods / deployments / pvcs / nodes（BR-02）</text>
+      <rect x="318" y="644" width="338" height="64" rx="9" fill="#f4f6f7" stroke="#e0e5e8"/><text x="330" y="665" font-size="10.5" font-weight="700" fill="#191a1e">helm hook: huntai-seed</text><text x="330" y="681" font-size="9.5" fill="#6e6e71">角色 / 用户 / demo-prod 集群 / 7 条规则</text><text x="330" y="696" font-size="9.5" fill="#6e6e71">3 条演示告警（seed 阶段不投递管道）</text>
+      <rect x="696" y="198" width="266" height="532" rx="14" fill="#fff" stroke="#e0e5e8"/><text x="712" y="223" font-size="12" font-weight="700" fill="#93551c">namespace: demo</text>
+      <rect x="712" y="240" width="232" height="52" rx="9" fill="#fff8e8" stroke="#ead49b"/><text x="724" y="261" font-size="10.5" font-weight="700" fill="#191a1e">react-ops-console :30081</text><text x="724" y="277" font-size="9.5" fill="#6e6e71">/java/* → Java · /python/* → Python</text>
+      <rect x="712" y="306" width="232" height="52" rx="9" fill="#fff" stroke="#d8dcdf"/><text x="724" y="327" font-size="10.5" font-weight="700" fill="#191a1e">java-order-service :8080</text><text x="724" y="343" font-size="9.5" fill="#6e6e71">Spring Boot · /api/orders · boom · slow</text>
+      <rect x="712" y="372" width="232" height="52" rx="9" fill="#fff" stroke="#d8dcdf"/><text x="724" y="393" font-size="10.5" font-weight="700" fill="#191a1e">python-inventory-service :8000</text><text x="724" y="409" font-size="9.5" fill="#6e6e71">FastAPI · /api/inventory · boom · slow</text>
+      <rect x="712" y="440" width="232" height="140" rx="9" fill="#fdf0f2" stroke="#eec0c8"/><text x="724" y="461" font-size="10.5" font-weight="700" fill="#c40f3a">faults.enabled=true</text><text x="724" y="478" font-size="9.5" fill="#5a5a5b">CrashLoopBackOff</text><text x="724" y="494" font-size="9.5" fill="#5a5a5b">ImagePullBackOff</text><text x="724" y="510" font-size="9.5" fill="#5a5a5b">Pending（64 核请求）</text><text x="724" y="526" font-size="9.5" fill="#5a5a5b">PVC Pending（缺 StorageClass）</text><text x="724" y="542" font-size="9.5" fill="#5a5a5b">副本数不一致（nodeSelector）</text><text x="724" y="564" font-size="9" fill="#c40f3a">演示用，禁止用于生产</text>
+      <rect x="712" y="596" width="232" height="66" rx="9" fill="#fff" stroke="#d8dcdf"/><text x="724" y="617" font-size="10.5" font-weight="700" fill="#191a1e">CronJob: demo-alert-reporter</text><text x="724" y="633" font-size="9.5" fill="#6e6e71">每 2 分钟 POST webhook</text><text x="724" y="649" font-size="9.5" fill="#6e6e71">同 fingerprint → occurrence_count 增长</text>
+      <rect x="1012" y="100" width="228" height="250" rx="14" fill="#fff" stroke="#d9c4ec"/><text x="1028" y="127" font-size="12.5" font-weight="700" fill="#191a1e">模型 Provider</text>
+      <rect x="1028" y="142" width="196" height="62" rx="9" fill="#f8f5fd" stroke="#e2d3f0"/><text x="1040" y="164" font-size="10.5" font-weight="700" fill="#191a1e">local · Ollama / vLLM</text><text x="1040" y="180" font-size="9.5" fill="#6e6e71">默认路由目标</text><text x="1040" y="195" font-size="9" fill="#6e6e71">未部署时 → NoAI 降级</text>
+      <rect x="1028" y="216" width="196" height="62" rx="9" fill="#f8f5fd" stroke="#e2d3f0"/><text x="1040" y="238" font-size="10.5" font-weight="700" fill="#191a1e">external · OpenAI 兼容</text><text x="1040" y="254" font-size="9.5" fill="#6e6e71">DeepSeek / OpenAI</text><text x="1040" y="269" font-size="9" fill="#8b12d6">需显式开启出域</text>
+      <text x="1028" y="304" font-size="9.5" fill="#6e6e71">脱敏 → 路由 → 预算 → 熔断</text><text x="1028" y="320" font-size="9.5" fill="#6e6e71">→ 调用 → 回填 → 审计</text><text x="1028" y="336" font-size="9" fill="#6e6e71">所有调用只走 AI Gateway</text>
+      <path d="M246 172 C270 172 282 260 316 260" fill="none" stroke="#c53520" stroke-width="1.6" marker-end="url(#arBrand)"/><text x="252" y="232" font-size="9.5" fill="#c53520">30080</text>
+      <path d="M246 240 C470 240 560 226 696 266" fill="none" stroke="#93551c" stroke-width="1.6" marker-end="url(#ar)"/><text x="470" y="234" font-size="9.5" fill="#93551c">30081</text>
+      <path d="M468 269 L486 269" fill="none" stroke="#8a9199" stroke-width="1.6" marker-end="url(#ar)"/>
+      <path d="M571 298 L571 322" fill="none" stroke="#8a9199" stroke-width="1.6" marker-end="url(#ar)"/>
+      <path d="M393 298 L393 478" fill="none" stroke="#8a9199" stroke-width="1.6" marker-end="url(#ar)"/><text x="402" y="462" font-size="9" fill="#6e6e71">读写</text>
+      <path d="M571 448 L571 478" fill="none" stroke="#8a9199" stroke-width="1.6" marker-end="url(#ar)"/>
+      <path d="M393 448 L393 570" fill="none" stroke="#0a8a54" stroke-width="1.6" marker-end="url(#arGreen)"/>
+      <path d="M656 596 C680 596 690 284 696 284" fill="none" stroke="#0a8a54" stroke-width="1.4" stroke-dasharray="4 4" marker-end="url(#arGreen)"/><text x="660" y="544" font-size="9" fill="#0a8a54">巡检快照</text>
+      <path d="M944 274 L977 274" fill="none" stroke="#9009e4" stroke-width="1.6" stroke-dasharray="5 4" marker-end="url(#arAi)"/><text x="916" y="258" font-size="9" fill="#9009e4">AI 出域</text>
+      <path d="M724 284 L712 284" fill="none" stroke="#8a9199" stroke-width="1.4" marker-end="url(#ar)"/>
+      <path d="M724 398 L712 398" fill="none" stroke="#8a9199" stroke-width="1.4" marker-end="url(#ar)"/>
+      <path d="M724 662 C680 662 650 654 656 634" fill="none" stroke="#8a9199" stroke-width="1.4" stroke-dasharray="4 4" marker-end="url(#ar)"/><text x="664" y="684" font-size="9" fill="#6e6e71">webhook</text>
+      <rect x="1012" y="384" width="228" height="146" rx="12" fill="#fff" stroke="#e8edf0"/><text x="1028" y="408" font-size="10.5" font-weight="700" fill="#191a1e">图例</text>
+      <circle cx="1032" cy="426" r="4" fill="#c53520"/><text x="1044" y="430" font-size="9.5" fill="#5a5a5b">平台入口 / 主链路</text><circle cx="1032" cy="446" r="4" fill="#93551c"/><text x="1044" y="450" font-size="9.5" fill="#5a5a5b">演示业务</text><circle cx="1032" cy="466" r="4" fill="#9009e4"/><text x="1044" y="470" font-size="9.5" fill="#5a5a5b">AI / 出域</text><circle cx="1032" cy="486" r="4" fill="#0a8a54"/><text x="1044" y="490" font-size="9.5" fill="#5a5a5b">只读 / 快照</text><circle cx="1032" cy="506" r="4" fill="#c40f3a"/><text x="1044" y="510" font-size="9.5" fill="#5a5a5b">故障注入</text>
+    </svg>
+  </div>
+
+  <h3>1.2 一条告警的旅程：四步管道</h3>
+  <p>告警从 webhook 进来后，不是“直接弹到页面上”，而是先落 PostgreSQL，再由 worker 异步推进四步：<strong>接入 → 去重 → 富化 → 关联</strong>。这就是为什么页面上能看到“管道四步卡”，也是为什么 <code>seed</code> 的 3 条演示告警会停在 <code>received</code>：seed 阶段用的是 no-op 入队，不会真的推进管道。</p>
+  <div class="flow-wrap"><div class="flow">
+    <div class="node brand"><b>① 接入</b><span>webhook 接收<br />归一化 + fingerprint</span></div><div class="arrow">→</div>
+    <div class="node"><b>② 落盘</b><span>写 PostgreSQL<br />status=received</span></div><div class="arrow">→</div>
+    <div class="node"><b>③ 入队</b><span>Redis q-alert-pipeline<br />立即返回 202</span></div><div class="arrow">→</div>
+    <div class="node green"><b>④ 去重</b><span>同指纹合并计数<br />不新建告警</span></div><div class="arrow">→</div>
+    <div class="node"><b>⑤ 富化</b><span>补 team / env<br />影响面</span></div><div class="arrow">→</div>
+    <div class="node"><b>⑥ 关联</b><span>规则命中 → 候选<br />否则 standalone</span></div><div class="arrow">→</div>
+    <div class="node brand"><b>⑦ 通知 / SSE</b><span>notified<br />实时推送页面</span></div>
+  </div></div>
+  <div class="callout why"><b>为什么先落盘再入队？</b>如果 Redis 或 worker 挂了，webhook 仍然能把告警原文写进 PostgreSQL 并立即返回；之后由回放器扫描 <code>received</code> 超时的告警补投。代价是接入路径多一次数据库写入，收益是“平台故障不丢告警”。这是 ADR-0003 的核心取舍。</div>
+
+  <h3>1.3 十项贯穿全局的设计原则</h3>
+  <div class="principle">
+    <div class="p"><b><i>01</i>先确定性，后 AI</b><p>巡检规则先产出结构化 finding；AI 只负责解释。没有模型时，告警、巡检、事件、通知仍然完整可用。</p></div>
+    <div class="p"><b><i>02</i>窄权限 + 确定性外壳</b><p>集群连接器只加载 readonly 凭证；AI 工具默认只读；写操作需要审批与审计，而不是把 kubectl 权限直接交给模型。</p></div>
+    <div class="p"><b><i>03</i>人在回路</b><p>关联规则在 candidate 模式下只能生成候选，必须人工确认才立项（BR-04）；AI 生成物同样需要确认（BR-05）。</p></div>
+    <div class="p"><b><i>04</i>先落盘再入队</b><p>告警原文先写 PostgreSQL，再投 Redis 队列；队列丢失可由回放器补投，正确性不依赖队列可用性。</p></div>
+    <div class="p"><b><i>05</i>模块化单体 + 同镜像多角色</b><p>API 与 5 类 worker 共用一个镜像，仅启动命令不同；单库内事务替代分布式 Saga，降低单人运维成本。</p></div>
+    <div class="p"><b><i>06</i>队列分级隔离</b><p>告警管道与通知是高优先级队列；巡检和 AI 是低优先级长任务。巡检再慢，也不会占满告警管道的 worker。</p></div>
+    <div class="p"><b><i>07</i>唯一 AI 出域口</b><p>所有模型调用都经 AI Gateway：先脱敏、再路由、查预算、过熔断、记调用日志。其他组件直连模型端点视为架构违规。</p></div>
+    <div class="p"><b><i>08</i>只追加审计</b><p>审计日志、AI 调用日志、通知记录只追加，不提供 UPDATE/DELETE 路径；关键动作都能回溯到人、时间与对象。</p></div>
+    <div class="p"><b><i>09</i>前后端边界清晰</b><p>前端权限只做菜单隐藏与按钮禁用；真正的 403/404 与团队行级过滤由后端权威执行。</p></div>
+    <div class="p"><b><i>10</i>降级优先于报错</b><p>模型不可用走 NoAI；集群探活失败把巡检 run 标记 failed；通知渠道不可用按 IM → 短信 → 电话降级。主链路不被旁路故障拖死。</p></div>
+  </div>
+
+  <h3>1.4 为什么是模块化单体，而不是微服务？</h3>
+  <p>这是一个单人可运维的项目。微服务会把部署、监控、告警、排障、链路追踪的面各乘以服务数；而告警、事件、通知之间的跨域操作在单库内就是本地事务。所以项目选择<strong>模块化单体 + worker</strong>：Python 包按子域拆分（alerts / inspections / incidents / oncall / ai / clusters / notifications / iam），模块间只经内部 service 调用，禁止跨模块直查他域表。等到“多团队并行开发同一平台”或“单库容量触顶”再拆，触发条件写在架构文档里，防止提前微服务化。</p>
+  <div class="table-wrap"><table><thead><tr><th>队列</th><th>任务</th><th>优先级</th><th>为什么要独立</th></tr></thead><tbody>
+    <tr><td><code>q-alert-pipeline</code></td><td>去重 → 富化 → 关联、回放、维护窗口收口</td><td>高</td><td>告警主链路不能被巡检/AI 长任务拖慢</td></tr>
+    <tr><td><code>q-notification</code></td><td>通知投递、渠道降级</td><td>高</td><td>处置时效直接影响升级链</td></tr>
+    <tr><td><code>q-escalation</code></td><td>升级超时检查</td><td>中</td><td>与通知解耦，按定时器推进</td></tr>
+    <tr><td><code>q-inspection</code></td><td>巡检执行、调度 tick、集群探活</td><td>低</td><td>长任务，独立 worker 组</td></tr>
+    <tr><td><code>q-ai</code></td><td>AI 任务执行、审批超时扫描</td><td>低</td><td>模型调用可能数十秒，不能影响告警</td></tr>
+  </tbody></table></div>
+
+  <h3>1.5 核心对象关系：从信号到闭环</h3>
+  <div class="grid two">
+    <div class="card tight"><h4>告警 → 事件</h4><p class="mini"><code>Provider</code> → <code>Alert</code> → <code>IncidentCandidate</code>（candidate 模式）→ <code>Incident</code> → <code>Postmortem</code> / <code>StatusPageEntry</code>。</p><p class="mini">告警也可以直接 <code>convert-to-incident</code>，或人工创建事件。事件与告警是多对多，关联关系落在 <code>incident_alerts</code>。</p></div>
+    <div class="card tight"><h4>集群 → 巡检 → 告警</h4><p class="mini"><code>Cluster</code> → <code>InspectionPolicy</code> → <code>InspectionRun</code> → <code>Finding</code> → 转告警（BR-09）→ <code>Alert</code> → 管道。</p><p class="mini">同一资源同一规则的 open/ack/in_progress finding 会被复用；已转告警的 finding 不再是 open，所以定时巡检会继续产生新 finding（见 §17 边界）。</p></div>
+    <div class="card tight"><h4>值班 → 通知</h4><p class="mini"><code>OnCallSchedule</code> → <code>EscalationPolicy</code> → <code>NotificationRecord</code>。每次投递、降级、Ack 都追加一条记录，而不是覆盖旧行。</p></div>
+    <div class="card tight"><h4>AI 任务 → 审计</h4><p class="mini"><code>AITask</code> → <code>AICallLog</code>；解释类任务还会写 <code>AIExplanation</code>。输入只存摘要，不存明文；脱敏映射本地加密保存。</p></div>
+  </div>
+
+  <h3>1.6 功能地图：页面、能力与验收方式</h3>
+  <div class="table-wrap"><table><thead><tr><th>页面 / 入口</th><th>能测什么</th><th>主要 API</th><th>自动验收</th></tr></thead><tbody>
+    <tr><td>/login</td><td>dev 登录、角色渲染</td><td><code>POST /auth/token</code>、<code>GET /users/me</code></td><td class="tag ok">✓</td></tr>
+    <tr><td>/alerts</td><td>四步管道、去重、ACK/关闭、误报建议、转事件、AI 解释</td><td><code>/alerts/*</code></td><td class="tag ok">✓</td></tr>
+    <tr><td>/candidates</td><td>关联候选确认 / 驳回三原因</td><td><code>/incident-candidates/*</code></td><td class="tag ok">✓</td></tr>
+    <tr><td>/incidents</td><td>6 态状态机、时间线、状态页、误报关闭</td><td><code>/incidents/*</code></td><td class="tag warn">部分</td></tr>
+    <tr><td>/inspections</td><td>findings、认领/忽略/重开、AI 解释</td><td><code>/findings/*</code></td><td class="tag ok">✓</td></tr>
+    <tr><td>/ai/tasks</td><td>AI 任务、预算、调用链、审批/取消</td><td><code>/ai/tasks/*</code></td><td class="tag ok">✓</td></tr>
+    <tr><td>/oncall</td><td>周排班、轮换、临时顶班、升级策略</td><td><code>/oncall-schedules</code>、<code>/escalation-policies</code></td><td class="tag ok">✓</td></tr>
+    <tr><td>/admin</td><td>集群探活、Provider、规则库、用户、审计</td><td><code>/clusters</code>、<code>/providers</code>、<code>/users</code>、<code>/audit-logs</code></td><td class="tag warn">部分</td></tr>
+    <tr><td>演示控制台 :18081</td><td>React → Java/Python 连通、5xx、慢请求</td><td><code>/java/*</code>、<code>/python/*</code></td><td class="tag ok">✓</td></tr>
+    <tr><td>Workflow（P3）</td><td>YAML CRUD、版本、审批、运行记录</td><td><code>/workflows</code>、<code>/workflow-runs</code></td><td class="tag bad">不在验收范围</td></tr>
+  </tbody></table></div>
+</section>
+
+<section id="s2">
+  <h2><span class="num">02</span>环境准备：把依赖和端口先理顺</h2>
+  <p class="sub">这一步的目标不是“装一堆工具”，而是确保 Docker、kind、kubectl、Helm、Python 与两个端口都处于可预测状态。</p>
+  <h3>2.1 资源与软件清单</h3>
+  <div class="table-wrap"><table><thead><tr><th>项目</th><th>最低</th><th>推荐</th><th>为什么</th></tr></thead><tbody>
+    <tr><td>Docker CPU</td><td>6 核</td><td>8 核及以上</td><td>3 个 kind 节点 + 平台约 9 个 Pod + 演示业务约 8–10 个 Pod</td></tr>
+    <tr><td>Docker 内存</td><td>10 GB</td><td>12–16 GB</td><td>PostgreSQL、Redis、Java/JVM、故障 Pod 同时运行</td></tr>
+    <tr><td>磁盘</td><td>15 GB 空闲</td><td>25 GB</td><td>5 个本地镜像 + kind 节点镜像 + 基础镜像</td></tr>
+    <tr><td>端口</td><td>8080、18081 空闲</td><td>同上</td><td>kind 把宿主机端口映射到 NodePort 30080 / 30081</td></tr>
+  </tbody></table></div>
+  <h3>2.2 安装与检查工具</h3>
+  <div class="code-block"><div class="code-head">bash · 安装工具（macOS）</div><pre><code>brew install kind helm kubectl python@3.12
+# Docker Desktop 需要单独安装并启动
+</code></pre></div>
+  <div class="code-block"><div class="code-head">bash · 一次性检查</div><pre><code>cd /path/to/kubelantern
+
+docker version --format '{{.Server.Version}}'
+kind version
+kubectl version --client
+helm version --short
+python3 --version
+curl --version | head -1
+</code></pre></div>
+  <div class="callout verify"><b>预期结果</b>Docker Server 有版本号；kind 为 v0.33 左右；kubectl 客户端可用；Helm 为 v3/v4；Python 为 3.12.x；curl 可用。如果 Docker 命令报 “Cannot connect to the Docker daemon”，先启动 Docker Desktop。</div>
+  <h3>2.3 检查两个端口</h3>
+  <div class="code-block"><div class="code-head">bash · 端口占用检查</div><pre><code>lsof -nP -iTCP:8080 -sTCP:LISTEN || echo "8080 free"
+lsof -nP -iTCP:18081 -sTCP:LISTEN || echo "18081 free"
+</code></pre></div>
+  <p class="mini">如果端口被占用，先停掉占用进程；或者修改 <code>deploy/kind/kind-config.yaml</code> 的 hostPort，并同步修改两个 Helm chart 的 nodePort，再重建集群。</p>
+  <h3>2.4 准备 .env：只放本地配置，不放真实凭据</h3>
+  <p>kind 演示环境的大部分配置来自 Helm values，不依赖仓库根 <code>.env</code>。你只有在两种情况下需要编辑它：<strong>接外部 AI（DeepSeek）</strong>，或使用 Compose 方式在本机跑后端依赖。</p>
+  <div class="code-block"><div class="code-head">bash · 创建本地 .env</div><pre><code>cp .env.example .env
+# 按需填写；接 DeepSeek 时至少确认以下键存在：
+# HUNTAI_AI_EXTERNAL_KEY=sk-xxxx
+# HUNTAI_AI_EXTERNAL_URL=https://api.deepseek.com/v1
+# HUNTAI_AI_EXTERNAL_MODEL=deepseek-chat
+</code></pre></div>
+  <div class="callout note"><b>kind 登录口令与 .env 不是同一个来源</b>演示环境的 <code>admin</code> 口令来自 Helm values 的 <code>secrets.devAuthPassword</code>，默认是 <code>your-demo-auth-password</code>。<code>.env</code> 里的 <code>HUNTAI_DEV_AUTH_PASSWORD</code> 只在使用 Compose/本机直跑 API 时生效。不要因为改了 <code>.env</code> 就以为 kind 集群的登录口令也变了。</div>
+  <h3>2.5 可选但推荐：安装提交护栏</h3>
+  <div class="code-block"><div class="code-head">bash · 安装 git hooks</div><pre><code>bash .zcode/scripts/setup-git-hooks.sh
+python3 .zcode/scripts/secret_scan.py path README.md
+</code></pre></div>
+  <p class="mini">仓库自带 pre-commit 凭据扫描；禁止 <code>git commit --no-verify</code>。扫描误报应由维护者调整 <code>.zcode/scripts/secret_scan.py</code>，不要在提交时绕过。</p>
+  <h3>2.6 两条运行方式：优先 kind</h3>
+  <div class="grid two">
+    <div class="card tight"><h4>方式一：kind 全量演示（推荐）</h4><p class="mini">平台、数据库、Redis、演示业务、故障资源全部在集群内。能测巡检、只读 SA、NodePort、Helm、完整 14 项验收。本手册默认这种方式。</p><p class="mini"><span class="tag ok">全功能</span> <span class="tag">可重复</span> <span class="tag">可清理</span></p></div>
+    <div class="card tight"><h4>方式二：Compose 仅后端依赖</h4><p class="mini">只启动 PostgreSQL + Redis，API 与前端在宿主机跑。适合前后端联调，不包含 3 节点集群、只读 SA、演示业务和故障注入。</p><div class="code-block" style="margin:8px 0 0"><pre><code>docker compose up -d postgres redis
+uv sync
+uv run alembic upgrade head
+uv run python -m huntai.seed --with-alerts
+uv run huntai-api
+cd frontend &amp;&amp; npm install &amp;&amp; npm run dev
+</code></pre></div></div>
+  </div>
+</section>
+
+<section id="s3">
+  <h2><span class="num">03</span>启动测试用 K8s 集群</h2>
+  <p class="sub">用 kind 创建 1 个 control-plane + 2 个 worker 的 3 节点集群，并把宿主机 8080/18081 映射进去。</p>
+  <ol class="steps"><li><b class="step-t">前置检查</b>确认 Docker 在跑、工具齐全、端口空闲。</li><li><b class="step-t">创建集群</b>首次会拉取 <code>kindest/node:v1.37.0</code>，可能需要几分钟。</li><li><b class="step-t">验证节点</b>3 个节点都 Ready，且恰好 3 个 Docker 容器。</li></ol>
+  <div class="code-block"><div class="code-head">bash · 创建 3 节点集群</div><pre><code>cd /path/to/kubelantern
+bash deploy/scripts/00-prereqs.sh
+bash deploy/scripts/01-create-cluster.sh
+</code></pre></div>
+  <h3>3.1 预期输出</h3>
+  <div class="code-block"><div class="code-head">text · 节点与容器</div><pre><code>NAME                       STATUS   ROLES           AGE   VERSION
+huntai-sre-control-plane   Ready    control-plane   ...   v1.37.0
+huntai-sre-worker          Ready    &lt;none&gt;          ...   v1.37.0
+huntai-sre-worker2         Ready    &lt;none&gt;          ...   v1.37.0
+
+NAMES                      STATUS   IMAGE
+huntai-sre-control-plane   Up ...   kindest/node:v1.37.0
+huntai-sre-worker          Up ...   kindest/node:v1.37.0
+huntai-sre-worker2         Up ...   kindest/node:v1.37.0
+</code></pre></div>
+  <div class="code-block"><div class="code-head">bash · 手工验证</div><pre><code>kubectl cluster-info
+kubectl get nodes -o wide
+kubectl get storageclass
+docker ps --filter label=io.x-k8s.kind.cluster=huntai-sre
+</code></pre></div>
+  <div class="callout verify"><b>通过标准</b><code>kubectl get nodes</code> 恰好 3 个节点且都为 Ready；<code>docker ps</code> 恰好 3 个 kind 容器；<code>storageclass</code> 里有 kind 默认的 <code>standard</code>（PostgreSQL PVC 会用到）。刚创建时 worker 可能短暂 NotReady，等 CNI 初始化完成即可。</div>
+  <h3>3.2 端口映射：为什么只记 8080 和 18081</h3>
+  <div class="table-wrap"><table><thead><tr><th>宿主机</th><th>kind 节点 NodePort</th><th>服务</th><th>用途</th></tr></thead><tbody>
+    <tr><td><code>127.0.0.1:8080</code></td><td><code>30080</code></td><td><code>huntai-web</code></td><td>React SPA + nginx 同源反代 <code>/api/</code></td></tr>
+    <tr><td><code>127.0.0.1:18081</code></td><td><code>30081</code></td><td><code>react-ops-console</code></td><td>演示控制台，反代 Java/Python 服务</td></tr>
+  </tbody></table></div>
+  <div class="callout why"><b>为什么用 NodePort + 端口映射，而不是 Ingress？</b>本地演示的目标是“零额外组件、零镜像仓库、离线也能跑”。NodePort 由 kind 的 extraPortMappings 直接映射到宿主机，不需要装 ingress-nginx，排障面更小。生产环境才需要 Ingress、TLS 与域名。</div>
+  <h3>3.3 集群创建失败时先看什么</h3>
+  <ul><li><strong>拉取 TLS timeout：</strong>脚本默认走 <code>PULL_MIRROR=docker.1ms.run</code>；网络好时可 <code>PULL_MIRROR="" bash deploy/scripts/01-create-cluster.sh</code>。</li><li><strong>节点版本不匹配：</strong>用 <code>KIND_NODE_IMAGE=kindest/node:v1.37.0 bash deploy/scripts/01-create-cluster.sh</code> 显式指定。</li><li><strong>端口占用：</strong>kind create 会失败；先释放端口或改映射。</li><li><strong>节点 NotReady：</strong>等 30–60 秒；仍不行看 <code>docker logs huntai-sre-worker --tail=100</code>。</li></ul>
+</section>
+
+<section id="s4">
+  <h2><span class="num">04</span>构建镜像并部署平台与演示业务</h2>
+  <p class="sub">5 个本地镜像构建后直接 <code>kind load</code> 进节点，不经过镜像仓库；平台和演示业务分两个 Helm release 部署。</p>
+  <h3>4.1 构建 5 个镜像</h3>
+  <div class="code-block"><div class="code-head">bash · 构建并加载镜像</div><pre><code>bash deploy/scripts/02-build-images.sh
+</code></pre></div>
+  <div class="table-wrap"><table><thead><tr><th>镜像</th><th>内容</th><th>用途</th></tr></thead><tbody>
+    <tr><td><code>huntai-sre:dev</code></td><td>Python 3.12 + FastAPI + arq</td><td>API 与 5 类 worker 共用</td></tr>
+    <tr><td><code>huntai-web:dev</code></td><td>Vite 构建 + nginx</td><td>React SPA 与同源代理</td></tr>
+    <tr><td><code>huntai-demo/java-order-service:dev</code></td><td>Spring Boot 3 / Java 21</td><td>订单服务</td></tr>
+    <tr><td><code>huntai-demo/python-inventory-service:dev</code></td><td>FastAPI</td><td>库存服务，也用于故障注入</td></tr>
+    <tr><td><code>huntai-demo/react-ops-console:dev</code></td><td>React 19 + nginx</td><td>演示控制台</td></tr>
+  </tbody></table></div>
+  <p class="mini">首次构建需要下载 Python/npm/Maven 依赖，通常 8–15 分钟；后续会命中 Docker 层缓存。Java 工程优先用宿主机 Maven 打 jar，避免容器内访问 Maven Central 超时；没有 <code>mvn</code> 时脚本会回退到多阶段构建。</p>
+  <div class="callout why"><b>为什么不用镜像仓库？</b>本地演示强调离线/弱网可用：<code>docker build</code> 后 <code>kind load docker-image</code> 直接把镜像塞进节点，省掉 push/pull、registry 凭据与网络不稳定。代价是每次改代码都要重新 build + load + rollout restart；这在本地是可以接受的。</div>
+  <h3>4.2 部署平台（namespace huntai）</h3>
+  <div class="code-block"><div class="code-head">bash · Helm 部署平台</div><pre><code>bash deploy/scripts/03-deploy-platform.sh
+</code></pre></div>
+  <p>这个 Chart 会创建 PostgreSQL、Redis、API、5 个 worker、Web、只读 ServiceAccount/ClusterRole/Token，以及一个 post-install/post-upgrade 的 seed Job。</p>
+  <div class="code-block"><div class="code-head">bash · 验证平台</div><pre><code>kubectl -n huntai get pods
+kubectl -n huntai get svc
+kubectl -n huntai get jobs
+kubectl -n huntai logs job/huntai-seed --tail=50
+curl -s http://127.0.0.1:8080/healthz
+</code></pre></div>
+  <div class="callout verify"><b>通过标准</b>所有 Pod Running/Ready；seed Job Completed；<code>/healthz</code> 返回 <code>{"status":"ok"}</code>。如果 seed 没跑成功，后面登录会提示“用户不存在或已停用”，先修 seed 再看其他功能。</div>
+  <h3>4.3 部署演示业务（namespace demo）</h3>
+  <div class="code-block"><div class="code-head">bash · 部署演示业务（默认带故障）</div><pre><code>bash deploy/scripts/04-deploy-demo.sh
+</code></pre></div>
+  <div class="callout note"><b>注意默认值差异</b><code>deploy/helm/huntai-demo/values.yaml</code> 里 <code>faults.enabled</code> 默认是 <code>false</code>，但 <code>04-deploy-demo.sh</code> 默认传 <code>FAULTS_ENABLED=true</code>。所以跑脚本会打开 5 类故障；直接 <code>helm upgrade</code> 且不传 <code>--set</code> 则不会。测试前先确认你要哪种状态。</div>
+  <div class="code-block"><div class="code-head">bash · 验证演示业务</div><pre><code>kubectl -n demo get deploy,pods,pvc -o wide
+curl -s http://127.0.0.1:18081/ | head -5
+curl -s http://127.0.0.1:18081/java/api/orders
+curl -s http://127.0.0.1:18081/python/api/inventory
+</code></pre></div>
+  <h3>4.4 登录入口与账号</h3>
+  <div class="table-wrap"><table><thead><tr><th>入口</th><th>地址</th><th>说明</th></tr></thead><tbody>
+    <tr><td>KubeLantern 平台</td><td><a href="http://127.0.0.1:8080">http://127.0.0.1:8080</a></td><td>React SPA + <code>/api/v1</code> 同源代理</td></tr>
+    <tr><td>演示业务控制台</td><td><a href="http://127.0.0.1:18081">http://127.0.0.1:18081</a></td><td>探测 Java/Python，触发 5xx 与慢请求</td></tr>
+  </tbody></table></div>
+  <div class="table-wrap"><table><thead><tr><th>用户名</th><th>角色</th><th>用途</th></tr></thead><tbody>
+    <tr><td><code>admin</code></td><td>平台管理员</td><td>全量功能、验收脚本、管理后台</td></tr>
+    <tr><td><code>sre-tony</code></td><td>SRE 工程师</td><td>告警处置、巡检、事件、AI 审批（本团队）</td></tr>
+    <tr><td><code>oncall-may</code></td><td>值班经理</td><td>排班/升级策略，告警与事件只读</td></tr>
+    <tr><td><code>dev-lee</code></td><td>研发（platform 团队）</td><td>团队级行级过滤，验证 developer 边界</td></tr>
+    <tr><td><code>viewer-guest</code></td><td>只读访客</td><td>验证越权拦截（告警列表 403）</td></tr>
+  </tbody></table></div>
+  <p class="mini">口令统一为 Helm values 的 <code>secrets.devAuthPassword</code>，默认 <code>your-demo-auth-password</code>。这是演示占位符，不是生产凭据。</p>
+  <div class="callout why"><b>为什么平台自己也部署在集群里？</b>这样巡检连接器使用的 <code>huntai-readonly</code> ServiceAccount 是真实的 K8s 身份，访问的是同一个集群的 API。你能真实验证 BR-02：只读凭证、最小权限、credential 只存 <code>secret_ref</code>、页面不回显凭证值。如果平台跑在宿主机、集群是假的，这条链路就无法验证。</div>
+</section>
+
+<section id="s5">
+  <h2><span class="num">05</span>一键验收：先确认环境没有坏</h2>
+  <p class="sub">验收脚本是纯标准库 Python，会等故障资源进入目标状态，然后跑 14 项检查。它是后续手工测试的基线。</p>
+  <h3>5.1 运行验收</h3>
+  <div class="code-block"><div class="code-head">bash · 默认 NoAI 模式</div><pre><code>bash deploy/scripts/05-run-acceptance.sh
+</code></pre></div>
+  <div class="code-block"><div class="code-head">bash · 已配置 DeepSeek 时</div><pre><code>HUNTAI_AI_MODE=deepseek bash deploy/scripts/05-run-acceptance.sh
+</code></pre></div>
+  <div class="callout danger"><b>验收模式必须与 AI 路由一致</b>默认脚本假设环境没有模型，AI 项断言任务最终是 <code>failed</code> + <code>noai</code>。如果你的环境已经按 <code>07-configure-ai.sh</code> 打开了 DeepSeek，却仍用默认模式跑，AI 项会因为任务实际 <code>completed</code> 而失败——这不是功能坏了，是验收口径不匹配。先查当前模式：<div class="code-block" style="margin-top:10px"><div class="code-head">bash · 查 AI 出域开关</div><pre><code>kubectl -n huntai get deploy huntai-worker-ai \
+  -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="HUNTAI_AI_EGRESS_ENABLED")].value}{"\n"}'
+</code></pre></div></div>
+  <h3>5.2 14 项检查覆盖什么</h3>
+  <div class="table-wrap"><table><thead><tr><th>#</th><th>检查项</th><th>关键断言</th></tr></thead><tbody>
+    <tr><td>1</td><td>3 节点集群</td><td>恰好 3 个 Docker 容器、3 个 Ready 节点</td></tr>
+    <tr><td>2</td><td>故障资源</td><td>CrashLoop / ImagePull / Pending / PVC / 副本不一致均进入目标状态</td></tr>
+    <tr><td>3</td><td>登录 / 会话</td><td><code>GET /users/me</code> 返回 admin 与角色</td></tr>
+    <tr><td>4</td><td>集群接入</td><td><code>test-connection</code> 返回 <code>connected</code> + <code>k8s_version</code></td></tr>
+    <tr><td>5</td><td>告警 L1</td><td>5 次上报 → 1 个 alert_id、后 4 次 merged=true、occurrence_count ≥ 5、状态到 notified</td></tr>
+    <tr><td>6</td><td>告警工作台</td><td>误报建议 accepted、ACK 写入、关闭后 resolved</td></tr>
+    <tr><td>7</td><td>事件闭环</td><td>同 namespace 两条告警生成候选，确认后 incident.source=correlation</td></tr>
+    <tr><td>8</td><td>巡检</td><td>命中 5 类故障规则，且 finding 已转告警</td></tr>
+    <tr><td>9</td><td>AI 治理</td><td>NoAI 时 failed+noai；DeepSeek 时 completed+external+call-log ok</td></tr>
+    <tr><td>10</td><td>SSE</td><td>订阅后收到 <code>alert.updated</code></td></tr>
+    <tr><td>11</td><td>值班</td><td>排班与两级升级策略创建、列表可读</td></tr>
+    <tr><td>12</td><td>演示业务</td><td>控制台 200、Java/Python JSON、5xx 端点返回 500</td></tr>
+    <tr><td>13</td><td>平台 Web</td><td>SPA 首页 200、<code>/healthz</code> 200、带 token 的 <code>/users/me</code> 200</td></tr>
+    <tr><td>14</td><td>权限</td><td>viewer 访问 <code>/alerts</code> 返回 403</td></tr>
+  </tbody></table></div>
+  <div class="callout verify"><b>预期结尾</b><code>验收结果：14 通过 / 0 失败 / 共 14 项</code>。任一失败退出码为 1，并在最后列出失败项与请求详情。</div>
+  <h3>5.3 可调参数</h3>
+  <div class="table-wrap"><table><thead><tr><th>环境变量</th><th>默认</th><th>说明</th></tr></thead><tbody>
+    <tr><td><code>HUNTAI_BASE_URL</code></td><td><code>http://127.0.0.1:8080/api/v1</code></td><td>API 地址</td></tr>
+    <tr><td><code>HUNTAI_WEB_URL</code></td><td><code>http://127.0.0.1:8080</code></td><td>SPA 地址</td></tr>
+    <tr><td><code>DEMO_CONSOLE_URL</code></td><td><code>http://127.0.0.1:18081</code></td><td>演示控制台</td></tr>
+    <tr><td><code>HUNTAI_USERNAME</code> / <code>HUNTAI_PASSWORD</code></td><td>admin / your-demo-auth-password</td><td>验收账号</td></tr>
+    <tr><td><code>KUBECTL_CHECK</code></td><td><code>1</code></td><td>设 0 跳过 Docker/kubectl 检查</td></tr>
+    <tr><td><code>FAULT_SETTLE_SECONDS</code></td><td><code>45</code></td><td>跳过 kubectl 检查时等待故障的时间</td></tr>
+    <tr><td><code>HUNTAI_AI_MODE</code></td><td><code>noai</code></td><td>设为 <code>deepseek</code> 时断言外部模型任务 completed</td></tr>
+  </tbody></table></div>
+  <h3>5.4 为什么验收要等 45 秒</h3>
+  <p class="mini">CrashLoopBackOff 不是“一启动就进入”的：容器要先失败若干次，Kubernetes 的退避窗口才会拉长。验收脚本甚至要求 restartCount ≥ 5 才算稳定，否则巡检快照可能恰好落在容器短暂 Running 的毫秒级窗口里，导致漏检。ImagePullBackOff 也需要节点实际尝试拉取后才会出现。</p>
+</section>
+
+<section id="s6">
+  <h2><span class="num">06</span>手工测试路线：90 分钟覆盖全部主链路</h2>
+  <p class="sub">按这个顺序走，后一步依赖前一步的数据，避免来回找对象。</p>
+  <div class="checklist" id="checklist">
+    <div class="checkitem"><input type="checkbox" id="c1" data-check="c1"/><label for="c1"><strong>环境与集群</strong><small>工具可用、3 节点 Ready、8080/18081 可访问。</small></label></div>
+    <div class="checkitem"><input type="checkbox" id="c2" data-check="c2"/><label for="c2"><strong>平台与演示业务</strong><small>huntai/demo 两个 namespace 的 Pod Ready，seed 成功。</small></label></div>
+    <div class="checkitem"><input type="checkbox" id="c3" data-check="c3"/><label for="c3"><strong>一键验收 14/14</strong><small>AI 模式与环境一致，失败项为 0。</small></label></div>
+    <div class="checkitem"><input type="checkbox" id="c4" data-check="c4"/><label for="c4"><strong>5 类故障注入</strong><small>CrashLoop / ImagePull / Pending / PVC / 副本不一致都能观察到。</small></label></div>
+    <div class="checkitem"><input type="checkbox" id="c5" data-check="c5"/><label for="c5"><strong>告警去重与处置</strong><small>同指纹合并计数；ACK/关闭/误报建议/转事件可用。</small></label></div>
+    <div class="checkitem"><input type="checkbox" id="c6" data-check="c6"/><label for="c6"><strong>巡检 findings 与 BR-09</strong><small>手动 run 成功，至少覆盖 5 类故障规则，warning/critical 已转告警。</small></label></div>
+    <div class="checkitem"><input type="checkbox" id="c7" data-check="c7"/><label for="c7"><strong>候选事件与事件状态机</strong><small>候选确认/驳回；事件走完 6 态，误报可取消。</small></label></div>
+    <div class="checkitem"><input type="checkbox" id="c8" data-check="c8"/><label for="c8"><strong>AI 解释与治理</strong><small>NoAI 或 DeepSeek 至少跑通一种；调用链、预算、脱敏可观察。</small></label></div>
+    <div class="checkitem"><input type="checkbox" id="c9" data-check="c9"/><label for="c9"><strong>值班、权限与审计</strong><small>排班/升级策略可读；viewer 403；developer 团队过滤；审计有记录。</small></label></div>
+    <div class="checkitem"><input type="checkbox" id="c10" data-check="c10"/><label for="c10"><strong>SSE 与演示业务</strong><small>收到 alert.updated；控制台 5xx/慢请求符合预期。</small></label></div>
+  </div>
+  <div class="table-wrap"><table><thead><tr><th>阶段</th><th>建议用时</th><th>你要留下什么证据</th></tr></thead><tbody>
+    <tr><td>登录与总览</td><td>5 min</td><td><code>/users/me</code> 返回角色；侧栏按角色渲染</td></tr>
+    <tr><td>告警管道</td><td>15 min</td><td>5 次 webhook → 1 条告警、occurrence_count 增长；SSE 事件</td></tr>
+    <tr><td>故障与巡检</td><td>20 min</td><td>5 类故障状态；巡检 run succeeded；findings 规则覆盖</td></tr>
+    <tr><td>候选与事件</td><td>15 min</td><td>候选成员告警 ID；确认后 incident.source=correlation；状态时间线</td></tr>
+    <tr><td>AI</td><td>15 min</td><td>任务终态、calls/tokens、call-log model/result_code、脱敏占位符</td></tr>
+    <tr><td>值班 / 权限 / 审计</td><td>15 min</td><td>schedule/policy ID；viewer 403；audit action 列表</td></tr>
+    <tr><td>演示业务 / SSE</td><td>5 min</td><td>控制台 200；Java/Python 500；SSE 事件帧</td></tr>
+  </tbody></table></div>
+</section>
+
+<section id="s7">
+  <h2><span class="num">07</span>故障注入：怎么触发对应的报错</h2>
+  <p class="sub">演示环境内置 5 类真实 Kubernetes 故障，全部由 Helm 开关控制，可开可关、可重复验证。</p>
+  <h3>7.1 五类故障与对应巡检规则</h3>
+  <div class="table-wrap"><table><thead><tr><th>场景</th><th>资源</th><th>怎么制造</th><th>预期状态</th><th>对应规则</th></tr></thead><tbody>
+    <tr><td>容器崩溃循环</td><td><code>Deployment/demo-fault-crashloop</code></td><td>Python 服务设置 <code>CRASH_ON_START=1</code>，启动即退出</td><td><code>CrashLoopBackOff</code>，restartCount 增长</td><td><code>pod-crashloopbackoff</code></td></tr>
+    <tr><td>镜像拉取失败</td><td><code>Deployment/demo-fault-imagepull</code></td><td>使用不存在的镜像 <code>ghcr.io/huntai-demo/not-found:0.0.0</code></td><td><code>ErrImagePull</code> → <code>ImagePullBackOff</code></td><td><code>pod-imagepullbackoff</code></td></tr>
+    <tr><td>调度失败</td><td><code>Deployment/demo-fault-pending</code></td><td>请求 64 核 CPU，kind 节点无法满足</td><td><code>Pending</code>，Events 显示 Insufficient cpu</td><td><code>pod-pending</code></td></tr>
+    <tr><td>PVC 未绑定</td><td><code>PersistentVolumeClaim/demo-fault-pvc</code></td><td>引用不存在的 StorageClass</td><td><code>Pending</code></td><td><code>pvc-pending</code></td></tr>
+    <tr><td>副本数不一致</td><td><code>Deployment/demo-fault-replicas-mismatch</code></td><td>2 副本 + 无匹配节点的 nodeSelector</td><td>ready 0 / desired 2</td><td><code>deployment-replicas-mismatch</code></td></tr>
+  </tbody></table></div>
+  <h3>7.2 一键观察故障</h3>
+  <div class="code-block"><div class="code-head">bash · 查看故障资源</div><pre><code>kubectl -n demo get pods -l huntai.io/fault -o wide
+kubectl -n demo get pvc demo-fault-pvc
+kubectl -n demo get deploy | grep demo-fault
+</code></pre></div>
+  <h3>7.3 逐类查看“报错信息”</h3>
+  <details><summary>CrashLoopBackOff：看容器上一次为什么退出</summary><div class="body"><div class="code-block"><div class="code-head">bash</div><pre><code>kubectl -n demo get pods -l huntai.io/fault=crashloop
+kubectl -n demo logs deploy/demo-fault-crashloop --tail=30
+kubectl -n demo describe pod -l huntai.io/fault=crashloop | tail -40
+</code></pre></div><p class="mini">预期能看到容器启动后立即退出，describe 的 Events 里有 Back-off restarting failed container。restartCount 到 5 以上后，退避窗口会拉长，状态更稳定，适合巡检快照。</p></div></details>
+  <details><summary>ImagePullBackOff：看镜像名与拉取失败原因</summary><div class="body"><div class="code-block"><div class="code-head">bash</div><pre><code>kubectl -n demo describe pod -l huntai.io/fault=imagepull | tail -50
+</code></pre></div><p class="mini">预期能看到 <code>Failed to pull image "ghcr.io/huntai-demo/not-found:0.0.0"</code>，随后进入 <code>ImagePullBackOff</code>。这需要节点实际尝试拉取，通常 30–60 秒。</p></div></details>
+  <details><summary>Pending：看调度器为什么拒绝</summary><div class="body"><div class="code-block"><div class="code-head">bash</div><pre><code>kubectl -n demo describe pod -l huntai.io/fault=pending | tail -50
+kubectl -n demo get events --sort-by=.lastTimestamp | tail -20
+</code></pre></div><p class="mini">预期 Events 里出现 <code>0/3 nodes are available: 3 Insufficient cpu</code>。这是资源请求过大的典型调度失败。</p></div></details>
+  <details><summary>PVC Pending：看不存在的 StorageClass</summary><div class="body"><div class="code-block"><div class="code-head">bash</div><pre><code>kubectl -n demo describe pvc demo-fault-pvc | tail -30
+kubectl get storageclass
+</code></pre></div><p class="mini">预期 PVC Events 显示找不到 <code>huntai-missing-storage-class</code>；集群里只有 kind 默认的 <code>standard</code>。</p></div></details>
+  <details><summary>副本数不一致：看 desired 与 ready</summary><div class="body"><div class="code-block"><div class="code-head">bash</div><pre><code>kubectl -n demo get deploy demo-fault-replicas-mismatch
+kubectl -n demo describe deploy demo-fault-replicas-mismatch | tail -30
+kubectl -n demo get pods -l huntai.io/fault=replicas -o wide
+</code></pre></div><p class="mini">预期 <code>READY 0/2</code>，Pod 因 nodeSelector 找不到匹配节点而 Pending。</p></div></details>
+  <h3>7.4 开关故障注入</h3>
+  <div class="code-block"><div class="code-head">bash · 关闭 / 打开故障</div><pre><code># 关闭：删除故障资源，但历史 finding/告警保留
+helm upgrade huntai-demo deploy/helm/huntai-demo -n demo --reuse-values \
+  --set faults.enabled=false
+
+# 打开：重新创建故障资源
+helm upgrade huntai-demo deploy/helm/huntai-demo -n demo --reuse-values \
+  --set faults.enabled=true
+</code></pre></div>
+  <div class="callout note"><b>关闭故障不会自动关闭历史发现</b>已产生的 finding 和告警保留审计；下一次巡检不会再为已删除的资源产生新 finding。需要“干净”的演示时，可以清库重建，或者接受历史数据继续存在。</div>
+  <h3>7.5 演示业务 5xx 与慢请求</h3>
+  <div class="code-block"><div class="code-head">bash · 触发业务错误</div><pre><code># Java 订单服务：返回 500
+curl -i http://127.0.0.1:18081/java/api/orders/boom
+
+# Python 库存服务：返回 500
+curl -i http://127.0.0.1:18081/python/api/inventory/boom
+
+# 慢请求：1.5 秒
+curl -i 'http://127.0.0.1:18081/java/api/orders/slow?ms=1500'
+curl -i 'http://127.0.0.1:18081/python/api/inventory/slow?ms=1500'
+</code></pre></div>
+  <div class="callout boundary"><b>5xx 不会自动变成平台告警</b>这两个端点只演示业务行为。要让 KubeLantern 产生告警，需要接入真实监控源，或直接调用 webhook（见 §08）。这是当前演示环境的边界，不是告警链路坏了。</div>
+  <h3>7.6 报错触发矩阵</h3>
+  <div class="table-wrap"><table><thead><tr><th>你想看到的报错</th><th>怎么触发</th><th>预期响应 / 状态</th></tr></thead><tbody>
+    <tr><td>Pod CrashLoopBackOff</td><td>默认故障注入</td><td><code>kubectl get pods</code> 显示 CrashLoopBackOff</td></tr>
+    <tr><td>ImagePullBackOff</td><td>默认故障注入</td><td>describe Pod 显示镜像拉取失败</td></tr>
+    <tr><td>调度失败</td><td>默认故障注入</td><td>Pod Pending + Insufficient cpu</td></tr>
+    <tr><td>PVC 未绑定</td><td>默认故障注入</td><td>PVC Pending</td></tr>
+    <tr><td>副本不一致</td><td>默认故障注入</td><td>Deployment READY 0/2</td></tr>
+    <tr><td>403 越权</td><td>viewer 访问 <code>/alerts</code></td><td>RFC 7807 <code>Forbidden</code></td></tr>
+    <tr><td>409 非法状态迁移</td><td>对已关闭事件再 close，或重复确认候选</td><td><code>INCIDENT_STATE_CONFLICT</code> / <code>CANDIDATE_STATE_CONFLICT</code></td></tr>
+    <tr><td>401 未认证</td><td>不带 Bearer token 调受保护接口</td><td><code>Unauthorized</code></td></tr>
+    <tr><td>404 团队隔离</td><td>developer 访问他团队告警详情</td><td>返回 404 而非 403，防资源探测</td></tr>
+    <tr><td>429 webhook 限流</td><td>同一 Provider 瞬时超过 100 个请求</td><td><code>RATE_LIMITED</code>，请求仍落盘待回放</td></tr>
+    <tr><td>NoAI</td><td>关闭外域且无本地 Ollama，触发 AI 解释</td><td>任务 <code>failed</code>，error 含 <code>noai</code></td></tr>
+    <tr><td>集群 disconnected</td><td>移除只读 token 或改错 API endpoint</td><td>探活 disconnected，巡检 run failed</td></tr>
+  </tbody></table></div>
+</section>
+
+<section id="s8">
+  <h2><span class="num">08</span>告警接入与降噪：把噪声变成可处置信号</h2>
+  <p class="sub">先拿 token，再手工上报同一指纹的告警，观察去重、富化、关联、SSE 与处置动作。</p>
+  <h3>8.1 拿一个管理员 token</h3>
+  <div class="code-block"><div class="code-head">bash · 登录并保存 token</div><pre><code>export BASE=http://127.0.0.1:8080/api/v1
+export AUTH=$(curl -s -X POST "$BASE/auth/token" \
+  -H 'content-type: application/json' \
+  -d '{"username":"admin","password":"your-demo-auth-password"}' \
+  | python3 -c 'import json,sys; print(json.load(sys.stdin)["access_token"])')
+
+echo "token length: ${#AUTH}"
+curl -s -H "Authorization: Bearer $AUTH" "$BASE/users/me" | python3 -m json.tool
+</code></pre></div>
+  <p class="mini">如果口令不是默认值，替换 <code>password</code>。kind 演示口令来自 Helm values，不是 <code>.env</code>。</p>
+  <h3>8.2 连续上报 5 次：观察去重</h3>
+  <div class="code-block"><div class="code-head">bash · 同指纹重复上报</div><pre><code>for i in 1 2 3 4 5; do
+  curl -s -X POST "$BASE/alerts/webhook/demo-alertmanager" \
+    -H 'content-type: application/json' \
+    -d '{
+      "status":"firing",
+      "severity":"critical",
+      "title":"手工验收：API 5xx 激增",
+      "labels":{
+        "alertname":"ManualApi5xx",
+        "namespace":"demo",
+        "team":"platform",
+        "cluster":"huntai-sre"
+      }
+    }'
+  echo
+done
+</code></pre></div>
+  <div class="callout verify"><b>预期</b>第一次返回 <code>{"alert_id":N,"merged":false}</code>，后 4 次返回同一个 alert_id 且 <code>merged:true</code>。工作台出现 1 条 <code>ManualApi5xx</code>，<code>occurrence_count</code> 增长到 5，状态在几秒内从 <code>received</code> 推进到 <code>notified</code>。</div>
+  <div class="callout why"><b>指纹是怎么算的？</b>演示 Provider <code>demo-alertmanager</code> 配置了 <code>fingerprint_fields = ["alertname","namespace","cluster"]</code>。只有这三个字段完全相同才算同一条告警；改 <code>alertname</code> 或 <code>namespace</code> 会生成新告警。富化规则再把 <code>team</code> 等字段补进 <code>enrichments</code>，但不会改变指纹。</div>
+  <h3>8.3 在页面上看四步管道</h3>
+  <ol><li>打开 <a href="http://127.0.0.1:8080/alerts">http://127.0.0.1:8080/alerts</a>。</li><li>看顶部四张管道卡：接入、去重、富化、关联。激活态表示该步有新增待处理量。</li><li>点开 <code>ManualApi5xx</code>，在详情抽屉里看 fingerprint、富化字段、原始 payload、AI 解释。</li><li>用右侧行内按钮试 <strong>认领（Ack）</strong> 与 <strong>关闭</strong>；关闭后状态为 <code>resolved</code>。</li><li>在详情抽屉里试 <strong>转事件</strong> 和 <strong>抑制建议</strong>。</li></ol>
+  <h3>8.4 关闭与恢复</h3>
+  <div class="code-block"><div class="code-head">bash · 发送 resolved 事件</div><pre><code>curl -s -X POST "$BASE/alerts/webhook/demo-alertmanager" \
+  -H 'content-type: application/json' \
+  -d '{
+    "status":"resolved",
+    "labels":{
+      "alertname":"ManualApi5xx",
+      "namespace":"demo",
+      "cluster":"huntai-sre"
+    }
+  }'
+</code></pre></div>
+  <p class="mini">同一指纹的活跃告警会被置为 <code>resolved</code>；如果当前没有活跃告警，会新建一条已解决记录。这就是 Alertmanager 恢复事件的基本语义。</p>
+  <h3>8.5 候选事件：关联规则不替你立项</h3>
+  <div class="code-block"><div class="code-head">bash · 创建 candidate 模式关联规则</div><pre><code>export NS="manual-demo"
+export RULE="manual-namespace-rule"
+
+curl -s -X POST "$BASE/correlation-rules" \
+  -H "Authorization: Bearer $AUTH" \
+  -H 'content-type: application/json' \
+  -d "{
+    \"name\":\"$RULE\",
+    \"conditions\":{
+      \"op\":\"AND\",
+      \"rules\":[{\"field\":\"namespace\",\"operator\":\"eq\",\"value\":\"$NS\"}],
+      \"group_by\":[\"namespace\"]
+    },
+    \"time_window_seconds\":600,
+    \"mode\":\"candidate\",
+    \"enabled\":true
+  }" | python3 -m json.tool
+</code></pre></div>
+  <div class="code-block"><div class="code-head">bash · 向该 namespace 发两条不同告警</div><pre><code>for NAME in ErrorA ErrorB; do
+  curl -s -X POST "$BASE/alerts/webhook/demo-alertmanager" \
+    -H 'content-type: application/json' \
+    -d "{
+      \"status\":\"firing\",
+      \"severity\":\"warning\",
+      \"title\":\"手工关联告警 $NAME\",
+      \"labels\":{
+        \"alertname\":\"Manual$NAME\",
+        \"namespace\":\"$NS\",
+        \"team\":\"platform\",
+        \"cluster\":\"huntai-sre\"
+      }
+    }"
+  echo
+done
+</code></pre></div>
+  <div class="callout verify"><b>预期</b>打开 <a href="http://127.0.0.1:8080/candidates">候选事件</a>，出现一张候选卡，成员告警就是刚发的两条。点 <strong>确认立项</strong> 生成事件；或点 <strong>驳回</strong> 选择三原因之一（规则过宽 / 时间窗过长 / 富化字段错误），驳回原因回流规则调优。</div>
+  <div class="callout why"><b>为什么候选不自动立项？</b>关联规则难免误聚合。BR-04 要求 candidate 模式先产出候选，由人确认；只有运行足够久、确认/驳回统计达标的规则，才考虑切到 auto。这避免“规则一抖，事件风暴”。</div>
+  <h3>8.6 维护窗口：验证抑制</h3>
+  <div class="code-block"><div class="code-head">bash · 创建 2 小时维护窗口</div><pre><code>START=$(python3 -c 'from datetime import datetime,timezone,timedelta; print((datetime.now(timezone.utc)-timedelta(minutes=5)).isoformat().replace("+00:00","Z"))')
+END=$(python3 -c 'from datetime import datetime,timezone,timedelta; print((datetime.now(timezone.utc)+timedelta(hours=2)).isoformat().replace("+00:00","Z"))')
+
+curl -s -X POST "$BASE/maintenance-windows" \
+  -H "Authorization: Bearer $AUTH" \
+  -H 'content-type: application/json' \
+  -d "{
+    \"name\":\"演练维护窗口\",
+    \"scope\":{\"matchers\":[{\"field\":\"namespace\",\"operator\":\"eq\",\"value\":\"maint-demo\"}]},
+    \"starts_at\":\"$START\",
+    \"ends_at\":\"$END\",
+    \"reason\":\"手工验证 BR-07 抑制\"
+  }" | python3 -m json.tool
+</code></pre></div>
+  <div class="code-block"><div class="code-head">bash · 向 maint-demo 发一条告警</div><pre><code>curl -s -X POST "$BASE/alerts/webhook/demo-alertmanager" \
+  -H 'content-type: application/json' \
+  -d '{
+    "status":"firing",
+    "severity":"warning",
+    "title":"维护窗口内预期告警",
+    "labels":{
+      "alertname":"MaintenanceDemo",
+      "namespace":"maint-demo",
+      "team":"platform",
+      "cluster":"huntai-sre"
+    }
+  }'
+</code></pre></div>
+  <p class="mini">预期告警状态为 <code>suppressed</code>，并带 <code>suppressed_by_window_id</code>。窗口结束后，后台 cron 会把仍未恢复的 suppressed 告警重新入管道（BR-07），通常 1 分钟内完成。</p>
+  <h3>8.7 SSE：看实时事件</h3>
+  <div class="code-block"><div class="code-head">bash · 终端 A：订阅</div><pre><code>curl -N -H "Authorization: Bearer $AUTH" \
+  "$BASE/realtime/stream?topics=alerts"
+</code></pre></div>
+  <div class="code-block"><div class="code-head">bash · 终端 B：触发一条新告警</div><pre><code>curl -s -X POST "$BASE/alerts/webhook/demo-alertmanager" \
+  -H 'content-type: application/json' \
+  -d '{
+    "status":"firing",
+    "severity":"warning",
+    "title":"SSE 演示告警",
+    "labels":{
+      "alertname":"SseDemo",
+      "namespace":"demo",
+      "team":"platform",
+      "cluster":"huntai-sre"
+    }
+  }'
+</code></pre></div>
+  <div class="callout verify"><b>预期</b>终端 A 出现 <code>event: alert.updated</code> 与 <code>data: {"resource":"alert","resource_id":...}</code>；每 15 秒还会看到 <code>: ping</code> 心跳。先连接再触发，SSE 默认从订阅时刻开始推；支持 <code>Last-Event-ID</code> 回放。</div>
+  <h3>8.8 可选：触发 webhook 限流</h3>
+  <details><summary>并发 120 次上报，观察 429（会制造演示噪声）</summary><div class="body"><div class="code-block"><div class="code-head">bash · 仅在需要验证限流时执行</div><pre><code>seq 1 120 | xargs -P 20 -I{} curl -s -o /dev/null -w '%{http_code}\n' \
+  -X POST "$BASE/alerts/webhook/demo-alertmanager" \
+  -H 'content-type: application/json' \
+  -d '{
+    "status":"firing",
+    "severity":"info",
+    "title":"限流演练",
+    "labels":{"alertname":"RateLimitDemo","namespace":"rate-demo","team":"platform","cluster":"huntai-sre"}
+  }' | sort | uniq -c
+</code></pre></div><p class="mini">默认每个 Provider 令牌桶容量 100、速率 10/s。超限请求仍会落盘，但响应改写为 429 <code>RATE_LIMITED</code>，随后由回放器补投。验证完建议用独立 namespace，避免污染主演示数据。</p></div></details>
+</section>
+
+<section id="s9">
+  <h2><span class="num">09</span>巡检：从真实故障到 finding 与告警</h2>
+  <p class="sub">巡检是确定性规则扫描：只读快照 → 7 条规则 → findings → warning/critical 转告警 → 可选 AI 解释。</p>
+  <h3>9.1 巡检闭环</h3>
+  <div class="flow-wrap"><div class="flow">
+    <div class="node brand"><b>触发</b><span>cron tick<br />或手工 run</span></div><div class="arrow">→</div>
+    <div class="node green"><b>只读快照</b><span>huntai-readonly SA<br />pods/deploy/pvc/nodes</span></div><div class="arrow">→</div>
+    <div class="node"><b>7 条 Analyzer</b><span>纯函数<br />无副作用</span></div><div class="arrow">→</div>
+    <div class="node"><b>Finding</b><span>rule_code + resource<br />severity/raw_error</span></div><div class="arrow">→</div>
+    <div class="node brand"><b>BR-09</b><span>warning/critical<br />转告警</span></div><div class="arrow">→</div>
+    <div class="node ai"><b>AI 解释</b><span>ai_explain_level<br />达标才入 q-ai</span></div><div class="arrow">→</div>
+    <div class="node"><b>处置</b><span>ack / ignore / reopen</span></div>
+  </div></div>
+  <div class="callout why"><b>为什么要“确定性外壳”</b>规则命中是事实，AI 解释是建议。模型不可用时 finding 仍然成立，告警仍然产生；AI 只是把 raw_error 翻译成人能读的诊断。</div>
+  <h3>9.2 用 API 创建巡检策略并手动跑一次</h3>
+  <p>巡检页面负责展示 findings 与处置，但“创建策略 / 手动触发”当前主要通过 API 或验收脚本完成。下面这段是完整可执行的最小流程。</p>
+  <div class="code-block"><div class="code-head">bash · 创建策略</div><pre><code>export CLUSTER_ID=$(curl -s -H "Authorization: Bearer $AUTH" \
+  "$BASE/clusters?limit=100" \
+  | python3 -c 'import json,sys; d=json.load(sys.stdin); print(next(c["id"] for c in d["items"] if c["name"]=="demo-prod"))')
+
+RULES=$(curl -s -H "Authorization: Bearer $AUTH" \
+  "$BASE/inspection-rules?limit=100" \
+  | python3 -c 'import json,sys; print(json.dumps([r["id"] for r in json.load(sys.stdin)["items"] if r["enabled"]]))')
+
+curl -s -X POST "$BASE/inspection-policies" \
+  -H "Authorization: Bearer $AUTH" \
+  -H 'content-type: application/json' \
+  -d "{
+    \"cluster_id\":$CLUSTER_ID,
+    \"name\":\"manual-policy\",
+    \"schedule\":\"*/5 * * * *\",
+    \"ai_explain_level\":\"off\",
+    \"rule_ids\":$RULES,
+    \"enabled\":true
+  }" | tee /tmp/policy.json | python3 -m json.tool
+
+export POLICY_ID=$(python3 -c 'import json; print(json.load(open("/tmp/policy.json"))["id"])')
+echo "policy=$POLICY_ID"
+</code></pre></div>
+  <div class="code-block"><div class="code-head">bash · 触发一次 run</div><pre><code>curl -s -X POST "$BASE/inspection-policies/$POLICY_ID/run" \
+  -H "Authorization: Bearer $AUTH" | tee /tmp/run.json | python3 -m json.tool
+
+export RUN_ID=$(python3 -c 'import json; print(json.load(open("/tmp/run.json"))["id"])')
+echo "run=$RUN_ID"
+</code></pre></div>
+  <div class="code-block"><div class="code-head">bash · 轮询 run 状态</div><pre><code>watch -n 2 "curl -s -H 'Authorization: Bearer $AUTH' \
+  '$BASE/inspection-runs/$RUN_ID' | python3 -m json.tool"
+</code></pre></div>
+  <p class="mini">没有 <code>watch</code> 时，重复执行单条 curl 即可。预期 run 从 <code>running</code> 变为 <code>succeeded</code>，<code>findings_count</code> ≥ 1，<code>result.converted_to_alert</code> 反映转告警数量。</p>
+  <h3>9.3 预期命中哪些规则</h3>
+  <div class="table-wrap"><table><thead><tr><th>rule_code</th><th>资源</th><th>severity</th><th>预期</th></tr></thead><tbody>
+    <tr><td><code>pod-crashloopbackoff</code></td><td><code>demo-fault-crashloop-*</code></td><td>critical</td><td>已转告警</td></tr>
+    <tr><td><code>pod-imagepullbackoff</code></td><td><code>demo-fault-imagepull-*</code></td><td>critical</td><td>已转告警</td></tr>
+    <tr><td><code>pod-pending</code></td><td><code>demo-fault-pending-*</code>、<code>demo-fault-replicas-mismatch-*</code></td><td>warning</td><td>已转告警</td></tr>
+    <tr><td><code>pvc-pending</code></td><td><code>demo-fault-pvc</code></td><td>warning</td><td>已转告警</td></tr>
+    <tr><td><code>deployment-replicas-mismatch</code></td><td><code>demo-fault-replicas-mismatch</code></td><td>warning</td><td>已转告警</td></tr>
+    <tr><td><code>pod-high-restarts</code></td><td>restartCount ≥ 10 的 Pod</td><td>warning</td><td>取决于故障持续时长</td></tr>
+    <tr><td><code>node-pressure</code></td><td>有 Memory/Disk/PIDPressure 的节点</td><td>warning</td><td>通常不命中</td></tr>
+  </tbody></table></div>
+  <h3>9.4 看 findings 与执行处置</h3>
+  <div class="code-block"><div class="code-head">bash · 拉取 findings</div><pre><code>curl -s -H "Authorization: Bearer $AUTH" \
+  "$BASE/findings?cluster_id=$CLUSTER_ID&limit=20" \
+  | python3 -c 'import json,sys
+d=json.load(sys.stdin)
+for f in d["items"]:
+    print(f["id"], f["rule_code"], f["severity"], f["status"], f["resource_ref"], "alert=", f.get("converted_alert_id"))'
+</code></pre></div>
+  <p>打开 <a href="http://127.0.0.1:8080/inspections">巡检看板</a>，可以：</p>
+  <ul><li><strong>认领</strong>：仅 <code>open</code> 状态可认领，写入 assignee 与审计。</li><li><strong>忽略</strong>：必须填写原因（D-10），否则前端不允许提交。</li><li><strong>重开</strong>：仅 <code>ignored</code> / <code>resolved</code> 可重开（API；前端当前只展示状态）。</li><li><strong>AI 解释</strong>：warning/critical 可点；info 级按钮禁用（BR-09）。</li></ul>
+  <h3>9.5 warning/critical 自动转告警</h3>
+  <p class="mini">巡检 run 产出 finding 时，<code>warning</code>/<code>critical</code> 会调用 <code>AlertService.ingest</code> 生成告警，标签里带 <code>source=huntai-inspection</code>、<code>alertname=rule_code</code>、<code>cluster</code>、<code>kind</code>、<code>namespace</code>、<code>name</code>。回到告警工作台，用搜索或 API 过滤 <code>source=huntai-inspection</code> 即可看到。</p>
+  <h3>9.6 自动 AI 解释：ai_explain_level</h3>
+  <div class="table-wrap"><table><thead><tr><th>策略值</th><th>哪些 finding 自动入 AI</th><th>用途</th></tr></thead><tbody>
+    <tr><td><code>off</code></td><td>不自动解释</td><td>默认，先看确定性结果</td></tr>
+    <tr><td><code>info</code></td><td>所有级别</td><td>演示时会产生较多 AI 任务</td></tr>
+    <tr><td><code>warning</code></td><td>warning + critical</td><td>推荐演示值</td></tr>
+    <tr><td><code>critical</code></td><td>仅 critical</td><td>控制成本</td></tr>
+  </tbody></table></div>
+  <p class="mini">把策略的 <code>ai_explain_level</code> 改为 <code>warning</code> 后重跑一次巡检，warning/critical finding 会自动创建 A1 任务；没有模型时任务落 NoAI，但 finding 与告警不受影响。</p>
+  <div class="callout note"><b>定时巡检会持续产生新 finding</b>同一资源同一规则的 <code>open/acknowledged/in_progress</code> finding 会被复用；但一旦 finding 被转成告警，状态变为 <code>converted_to_alert</code>，不再属于“未处置”，下一次定时巡检会为新的一轮再建 finding。长时间开着 <code>*/5 * * * *</code> 的策略会积累大量数据。演示完可以停用策略，或接受这些审计数据。</div>
+</section>
+
+<section id="s10">
+  <h2><span class="num">10</span>候选与事件：人在回路的状态机</h2>
+  <p class="sub">候选确认后事件才立项；事件必须按 6 态合法迁移，误报走 cancelled 并记录原因。</p>
+  <h3>10.1 事件状态机</h3>
+  <div class="svg-wrap" aria-label="事件六态状态机">
+    <svg viewBox="0 0 1200 380" role="img" aria-labelledby="incTitle incDesc">
+      <title id="incTitle">事件六态状态机</title><desc id="incDesc">事件从 open 开始，可依次进入 acknowledged、mitigated、resolved、closed；open 也可因误报进入 cancelled。非法迁移返回 409。</desc>
+      <defs><marker id="sar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#8a9199"/></marker><marker id="sarRed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#c40f3a"/></marker></defs>
+      <rect x="12" y="12" width="1176" height="356" rx="18" fill="#fbfcfc" stroke="#e8edf0"/>
+      <text x="38" y="48" font-size="17" font-weight="700" fill="#191a1e">Incident 6 态状态机</text><text x="38" y="68" font-size="10.5" fill="#6e6e71">非法迁移一律 409 INCIDENT_STATE_CONFLICT；cancelled 必须填原因（D-10）</text>
+      <rect x="40" y="130" width="180" height="70" rx="12" fill="#fdf3f1" stroke="#e9b9b2"/><text x="86" y="160" font-size="13" font-weight="700" fill="#191a1e">open</text><text x="86" y="180" font-size="10" fill="#6e6e71">立项</text>
+      <rect x="280" y="130" width="180" height="70" rx="12" fill="#fff" stroke="#d8dcdf"/><text x="310" y="160" font-size="13" font-weight="700" fill="#191a1e">acknowledged</text><text x="310" y="180" font-size="10" fill="#6e6e71">已确认</text>
+      <rect x="520" y="130" width="180" height="70" rx="12" fill="#fff" stroke="#d8dcdf"/><text x="558" y="160" font-size="13" font-weight="700" fill="#191a1e">mitigated</text><text x="558" y="180" font-size="10" fill="#6e6e71">已止血</text>
+      <rect x="760" y="130" width="180" height="70" rx="12" fill="#fff" stroke="#d8dcdf"/><text x="802" y="160" font-size="13" font-weight="700" fill="#191a1e">resolved</text><text x="802" y="180" font-size="10" fill="#6e6e71">已恢复</text>
+      <rect x="1000" y="130" width="150" height="70" rx="12" fill="#eef8f2" stroke="#b9dfc9"/><text x="1034" y="160" font-size="13" font-weight="700" fill="#191a1e">closed</text><text x="1034" y="180" font-size="10" fill="#6e6e71">已关闭</text>
+      <rect x="40" y="270" width="180" height="62" rx="12" fill="#fdf0f2" stroke="#eec0c8"/><text x="78" y="298" font-size="13" font-weight="700" fill="#c40f3a">cancelled</text><text x="78" y="316" font-size="10" fill="#6e6e71">误报关闭（原因必填）</text>
+      <path d="M220 165 L280 165" fill="none" stroke="#8a9199" stroke-width="1.6" marker-end="url(#sar)"/><text x="228" y="154" font-size="9.5" fill="#6e6e71">Ack</text>
+      <path d="M460 165 L520 165" fill="none" stroke="#8a9199" stroke-width="1.6" marker-end="url(#sar)"/><text x="468" y="154" font-size="9.5" fill="#6e6e71">止血</text>
+      <path d="M700 165 L760 165" fill="none" stroke="#8a9199" stroke-width="1.6" marker-end="url(#sar)"/><text x="708" y="154" font-size="9.5" fill="#6e6e71">恢复</text>
+      <path d="M940 165 L1000 165" fill="none" stroke="#8a9199" stroke-width="1.6" marker-end="url(#sar)"/><text x="948" y="154" font-size="9.5" fill="#6e6e71">关闭</text>
+      <path d="M130 200 L130 270" fill="none" stroke="#c40f3a" stroke-width="1.6" marker-end="url(#sarRed)"/><text x="140" y="240" font-size="9.5" fill="#c40f3a">误报</text>
+      <text x="38" y="348" font-size="10.5" fill="#6e6e71">P1/P2 事件在候选确认时自动同步状态页；人工可撤回同步（BR-06）</text>
+    </svg>
+  </div>
+  <h3>10.2 从告警转事件</h3>
+  <div class="code-block"><div class="code-head">bash · 告警转事件</div><pre><code># 取一条告警 ID
+ALERT_ID=$(curl -s -H "Authorization: Bearer $AUTH" "$BASE/alerts?limit=1" \
+  | python3 -c 'import json,sys; print(json.load(sys.stdin)["items"][0]["id"])')
+
+curl -s -X POST "$BASE/alerts/$ALERT_ID/convert-to-incident" \
+  -H "Authorization: Bearer $AUTH" \
+  -H 'content-type: application/json' \
+  -d '{"title":"手工演练事件","severity":"P2","team":"platform"}' \
+  | tee /tmp/incident.json | python3 -m json.tool
+
+export INCIDENT_ID=$(python3 -c 'import json; print(json.load(open("/tmp/incident.json"))["id"])')
+echo "incident=$INCIDENT_ID"
+</code></pre></div>
+  <p class="mini">也可以在候选事件页点“确认立项”。人工立项则用 <code>POST /incidents</code>，带 <code>title</code>、<code>severity</code>、<code>team</code>、<code>related_alert_ids</code>。</p>
+  <h3>10.3 推进状态与添加处理记录</h3>
+  <div class="code-block"><div class="code-head">bash · 状态推进</div><pre><code>curl -s -X POST "$BASE/incidents/$INCIDENT_ID/acknowledge" -H "Authorization: Bearer $AUTH" >/dev/null
+curl -s -X POST "$BASE/incidents/$INCIDENT_ID/mitigate"   -H "Authorization: Bearer $AUTH" >/dev/null
+curl -s -X POST "$BASE/incidents/$INCIDENT_ID/resolve"    -H "Authorization: Bearer $AUTH" >/dev/null
+curl -s -X POST "$BASE/incidents/$INCIDENT_ID/close"      -H "Authorization: Bearer $AUTH" >/dev/null
+
+curl -s -H "Authorization: Bearer $AUTH" "$BASE/incidents/$INCIDENT_ID" | python3 -m json.tool
+</code></pre></div>
+  <div class="code-block"><div class="code-head">bash · 添加时间线处理记录</div><pre><code>curl -s -X POST "$BASE/incidents/$INCIDENT_ID/notes" \
+  -H "Authorization: Bearer $AUTH" \
+  -H 'content-type: application/json' \
+  -d '{"note":"已回滚订单服务到上一版本，错误率恢复"}' | python3 -m json.tool
+</code></pre></div>
+  <div class="callout verify"><b>预期</b>事件详情时间线出现“事件立项 → 已确认 → 止血完成 → 根因恢复 → 事件关闭”，人工记录以 <code>manual_note</code> 节点插入。状态页同步按钮在 P1/P2 候选确认时会自动置为“已同步”，也可以手动同步/撤回。</div>
+  <h3>10.4 误报关闭</h3>
+  <div class="code-block"><div class="code-head">bash · open 状态事件误报关闭</div><pre><code>curl -s -X POST "$BASE/incidents/$INCIDENT_ID/cancel" \
+  -H "Authorization: Bearer $AUTH" \
+  -H 'content-type: application/json' \
+  -d '{"cancelled_reason":"变更窗口内预期告警，确认误报"}' | python3 -m json.tool
+</code></pre></div>
+  <p class="mini"><code>cancelled</code> 是终态，不可再迁移；原因必填，写入时间线与审计。别把它当成“暂时关闭”。</p>
+  <h3>10.5 复盘报告（API 可用，页面仍是占位）</h3>
+  <div class="code-block"><div class="code-head">bash · 生成模板并写入根因</div><pre><code>curl -s -H "Authorization: Bearer $AUTH" \
+  "$BASE/incidents/$INCIDENT_ID/postmortem" | python3 -m json.tool
+
+curl -s -X PUT "$BASE/incidents/$INCIDENT_ID/postmortem" \
+  -H "Authorization: Bearer $AUTH" \
+  -H 'content-type: application/json' \
+  -d '{
+    "root_cause":"订单服务连接池配置过小，峰值流量下耗尽",
+    "action_items":[
+      {"content":"将连接池上限从 20 调到 80","owner_id":1,"status":"pending"},
+      {"content":"补充连接池饱和告警","owner_id":1,"status":"pending"}
+    ]
+  }' | python3 -m json.tool
+</code></pre></div>
+  <div class="callout boundary"><b>页面边界</b>事件详情页的“复盘报告”卡片当前只展示说明与状态，不渲染完整编辑器；复盘数据通过上面的 API 读写。把它当作 P2 后端能力 + 前端占位，不要用页面是否展示来判断复盘接口是否可用。</div>
+</section>
+
+<section id="s11">
+  <h2><span class="num">11</span>AI 使用与治理：默认不出域，失败也可解释</h2>
+  <p class="sub">AI 不是黑盒按钮：它经过脱敏、路由、预算、熔断、调用审计与回填还原。先理解链路，再决定测 NoAI 还是 DeepSeek。</p>
+  <h3>11.1 AI 网关链路</h3>
+  <div class="svg-wrap" aria-label="AI 网关链路图">
+    <svg viewBox="0 0 1240 560" role="img" aria-labelledby="aiTitle aiDesc">
+      <title id="aiTitle">AI 网关链路</title><desc id="aiDesc">AI 任务从 finding、incident 或描述构建上下文，经脱敏、模型路由、预算与熔断检查后调用本地或外部 Provider，结果在本地还原占位符并写入 AIExplanation，同时记录 AICallLog 与审计。模型不可用时进入 NoAI 失败分支。</desc>
+      <defs><marker id="aar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#8a9199"/></marker><marker id="aarAi" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#9009e4"/></marker><marker id="aarRed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#c40f3a"/></marker></defs>
+      <rect x="12" y="12" width="1216" height="536" rx="18" fill="#fbfcfc" stroke="#e8edf0"/>
+      <text x="38" y="48" font-size="17" font-weight="700" fill="#191a1e">AI Gateway：唯一模型出域口</text><text x="38" y="68" font-size="10.5" fill="#6e6e71">脱敏 → 路由 → 预算 → 熔断 → 调用 → 回填 → 审计；默认只走本地，外部需显式开启</text>
+      <rect x="38" y="94" width="190" height="100" rx="12" fill="#fff" stroke="#d8dcdf"/><text x="54" y="120" font-size="12" font-weight="700" fill="#191a1e">任务输入</text><text x="54" y="140" font-size="10" fill="#5a5a5b">Finding 解释（A1）</text><text x="54" y="157" font-size="10" fill="#5a5a5b">Incident 调查（A2）</text><text x="54" y="174" font-size="10" fill="#5a5a5b">描述生成 Workflow（A3）</text>
+      <rect x="260" y="94" width="190" height="100" rx="12" fill="#fff" stroke="#d8dcdf"/><text x="276" y="120" font-size="12" font-weight="700" fill="#191a1e">构建上下文</text><text x="276" y="140" font-size="10" fill="#5a5a5b">rule_code / 资源 / raw_error</text><text x="276" y="157" font-size="10" fill="#5a5a5b">事件标题 / 描述</text><text x="276" y="174" font-size="10" fill="#6e6e71">不拼接无关业务数据</text>
+      <rect x="482" y="94" width="220" height="100" rx="12" fill="#f8f5fd" stroke="#d9c4ec"/><text x="498" y="120" font-size="12" font-weight="700" fill="#191a1e">脱敏 BR-01</text><text x="498" y="140" font-size="10" fill="#5a5a5b">namespace / pod → K8S_MASK_NNNN</text><text x="498" y="157" font-size="10" fill="#5a5a5b">IP / password / token</text><text x="498" y="174" font-size="10" fill="#6e6e71">原值本地信封加密，不落 prompt</text>
+      <rect x="734" y="94" width="210" height="100" rx="12" fill="#fff" stroke="#d8dcdf"/><text x="750" y="120" font-size="12" font-weight="700" fill="#191a1e">模型路由 BR-12</text><text x="750" y="140" font-size="10" fill="#5a5a5b">默认 local</text><text x="750" y="157" font-size="10" fill="#5a5a5b">egress=true 且配置完整 → external</text><text x="750" y="174" font-size="10" fill="#6e6e71">任务类型预留分级路由</text>
+      <rect x="976" y="94" width="220" height="100" rx="12" fill="#fff" stroke="#d8dcdf"/><text x="992" y="120" font-size="12" font-weight="700" fill="#191a1e">预算 + 熔断</text><text x="992" y="140" font-size="10" fill="#5a5a5b">40 calls / 100k output tokens</text><text x="992" y="157" font-size="10" fill="#5a5a5b">连续 5 次失败开路 60s</text><text x="992" y="174" font-size="10" fill="#6e6e71">超限 graceful 终止</text>
+      <rect x="734" y="260" width="210" height="88" rx="12" fill="#f8f5fd" stroke="#d9c4ec"/><text x="750" y="286" font-size="11.5" font-weight="700" fill="#191a1e">local Provider</text><text x="750" y="306" font-size="10" fill="#5a5a5b">Ollama /api/chat</text><text x="750" y="323" font-size="10" fill="#6e6e71">未部署 → 调用失败 → NoAI</text>
+      <rect x="976" y="260" width="220" height="88" rx="12" fill="#f8f5fd" stroke="#d9c4ec"/><text x="992" y="286" font-size="11.5" font-weight="700" fill="#191a1e">external Provider</text><text x="992" y="306" font-size="10" fill="#5a5a5b">OpenAI 兼容 /chat/completions</text><text x="992" y="323" font-size="10" fill="#8b12d6">仅在显式出域时注册</text>
+      <rect x="482" y="260" width="220" height="88" rx="12" fill="#fff" stroke="#d8dcdf"/><text x="498" y="286" font-size="11.5" font-weight="700" fill="#191a1e">回填还原</text><text x="498" y="306" font-size="10" fill="#5a5a5b">K8S_MASK_NNNN → 原值</text><text x="498" y="323" font-size="10" fill="#6e6e71">还原结果只落本地库</text>
+      <rect x="260" y="260" width="190" height="88" rx="12" fill="#eef8f2" stroke="#b9dfc9"/><text x="276" y="286" font-size="11.5" font-weight="700" fill="#191a1e">输出</text><text x="276" y="306" font-size="10" fill="#5a5a5b">task.result</text><text x="276" y="323" font-size="10" fill="#5a5a5b">AIExplanation</text>
+      <rect x="260" y="404" width="190" height="86" rx="12" fill="#fff" stroke="#d8dcdf"/><text x="276" y="430" font-size="11.5" font-weight="700" fill="#191a1e">AICallLog</text><text x="276" y="450" font-size="10" fill="#5a5a5b">model / digest / tokens</text><text x="276" y="467" font-size="10" fill="#6e6e71">latency / result_code</text>
+      <rect x="482" y="404" width="220" height="86" rx="12" fill="#fff" stroke="#d8dcdf"/><text x="498" y="430" font-size="11.5" font-weight="700" fill="#191a1e">AuditLog</text><text x="498" y="450" font-size="10" fill="#5a5a5b">ai_task.complete / noai</text><text x="498" y="467" font-size="10" fill="#6e6e71">actor=system · 只追加</text>
+      <rect x="734" y="404" width="462" height="86" rx="12" fill="#fdf0f2" stroke="#eec0c8"/><text x="750" y="430" font-size="11.5" font-weight="700" fill="#c40f3a">NoAI 分支</text><text x="750" y="450" font-size="10" fill="#5a5a5b">模型不可用 / 熔断开路 / 调用失败 → status=failed，error 含 noai</text><text x="750" y="467" font-size="10" fill="#6e6e71">A1 仍写 AIExplanation（output.noai=true + raw_error），告警与巡检主链路不受影响</text>
+      <path d="M228 144 L260 144" fill="none" stroke="#8a9199" stroke-width="1.6" marker-end="url(#aar)"/><path d="M450 144 L482 144" fill="none" stroke="#8a9199" stroke-width="1.6" marker-end="url(#aar)"/><path d="M702 144 L734 144" fill="none" stroke="#9009e4" stroke-width="1.6" marker-end="url(#aarAi)"/><path d="M944 144 L976 144" fill="none" stroke="#8a9199" stroke-width="1.6" marker-end="url(#aar)"/>
+      <path d="M840 194 L840 260" fill="none" stroke="#9009e4" stroke-width="1.6" marker-end="url(#aarAi)"/><path d="M1086 194 L1086 260" fill="none" stroke="#9009e4" stroke-width="1.6" stroke-dasharray="5 4" marker-end="url(#aarAi)"/>
+      <path d="M734 304 L702 304" fill="none" stroke="#8a9199" stroke-width="1.6" marker-end="url(#aar)"/><path d="M482 304 L450 304" fill="none" stroke="#8a9199" stroke-width="1.6" marker-end="url(#aar)"/><path d="M355 348 L355 404" fill="none" stroke="#8a9199" stroke-width="1.6" marker-end="url(#aar)"/><path d="M450 438 L482 438" fill="none" stroke="#8a9199" stroke-width="1.6" marker-end="url(#aar)"/>
+      <path d="M944 348 C944 380 920 404 900 404" fill="none" stroke="#c40f3a" stroke-width="1.6" stroke-dasharray="5 4" marker-end="url(#aarRed)"/><text x="948" y="382" font-size="9.5" fill="#c40f3a">失败 / 开路</text>
+    </svg>
+  </div>
+  <h3>11.2 先确认当前环境是 NoAI 还是 external</h3>
+  <div class="code-block"><div class="code-head">bash · 查 AI 配置与最近任务</div><pre><code>kubectl -n huntai get deploy huntai-worker-ai \
+  -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="HUNTAI_AI_EGRESS_ENABLED")].value}{"\n"}'
+
+kubectl -n huntai get secret huntai-ai-secret --ignore-not-found
+
+curl -s -H "Authorization: Bearer $AUTH" "$BASE/ai/tasks?limit=5" \
+  | python3 -c 'import json,sys
+d=json.load(sys.stdin)
+for t in d["items"]: print(t["id"], t["type"], t["status"], t.get("error"))'
+</code></pre></div>
+  <h3>11.3 路径一：NoAI 降级（默认/无模型）</h3>
+  <p>如果环境没有 Ollama，并且没有开启外部模型，AI 任务会失败，但这是设计内行为。验证步骤：</p>
+  <ol class="steps"><li><b class="step-t">关闭外部出域</b><code>helm upgrade huntai deploy/helm/huntai-platform -n huntai --reuse-values --set config.aiEgressEnabled=false</code>，然后重启 API 与 AI worker。</li><li><b class="step-t">触发一次 AI 解释</b>在巡检看板选一条 warning/critical finding，点“AI”，或调用 <code>POST /findings/{id}/explain</code>。</li><li><b class="step-t">看任务终态</b>AI 任务中心出现 <code>failed</code>，错误包含 <code>noai: 模型不可用或熔断开路</code>。</li><li><b class="step-t">看调用链</b>任务详情 → 调用链，至少有一条 <code>result_code=error</code> 的记录（本地 Provider 调用失败）。</li></ol>
+  <div class="code-block"><div class="code-head">bash · 用 API 触发并轮询</div><pre><code>export FINDING_ID=$(curl -s -H "Authorization: Bearer $AUTH" \
+  "$BASE/findings?severity=critical&limit=1" \
+  | python3 -c 'import json,sys; print(json.load(sys.stdin)["items"][0]["id"])')
+
+TASK_ID=$(curl -s -X POST "$BASE/findings/$FINDING_ID/explain" \
+  -H "Authorization: Bearer $AUTH" \
+  | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')
+
+echo "task=$TASK_ID"
+for i in $(seq 1 30); do
+  BODY=$(curl -s -H "Authorization: Bearer $AUTH" "$BASE/ai/tasks/$TASK_ID")
+  STATUS=$(echo "$BODY" | python3 -c 'import json,sys; print(json.load(sys.stdin)["status"])')
+  echo "$STATUS"
+  case "$STATUS" in completed|failed|cancelled|budget_exceeded) break;; esac
+  sleep 2
+done
+echo "$BODY" | python3 -m json.tool
+</code></pre></div>
+  <h3>11.4 路径二：DeepSeek 外部模型</h3>
+  <p>推荐用于验证真实模型链路。密钥只放 <code>.env</code> 与集群 Secret，脚本不会打印 key。</p>
+  <div class="code-block"><div class="code-head">dotenv · .env（只写占位符，不要提交）</div><pre><code>HUNTAI_AI_EGRESS_ENABLED=true
+HUNTAI_AI_EXTERNAL_URL=https://api.deepseek.com/v1
+HUNTAI_AI_EXTERNAL_MODEL=deepseek-chat
+HUNTAI_AI_EXTERNAL_KEY_REF=env:HUNTAI_AI_EXTERNAL_KEY
+HUNTAI_AI_EXTERNAL_KEY=sk-xxxx
+</code></pre></div>
+  <div class="code-block"><div class="code-head">bash · 创建 Secret 并开启外部路由</div><pre><code>bash deploy/scripts/07-configure-ai.sh
+</code></pre></div>
+  <div class="code-block"><div class="code-head">bash · 验证</div><pre><code>kubectl -n huntai get secret huntai-ai-secret
+kubectl -n huntai rollout status deploy/huntai-worker-ai --timeout=180s
+HUNTAI_AI_MODE=deepseek bash deploy/scripts/05-run-acceptance.sh
+</code></pre></div>
+  <div class="callout verify"><b>预期</b>AI 任务最终 <code>completed</code>；<code>calls_used ≥ 1</code>、<code>tokens_used &gt; 0</code>；调用链 <code>model=external</code>、<code>result_code=ok</code>；告警解释接口返回的 <code>output.diagnosis</code> 非空，且不含 <code>noai</code>。</div>
+  <h3>11.5 脱敏到底做了什么？</h3>
+  <p>以 finding 解释为例，网关会把 namespace、pod 名、IP、credential 形态的文本替换成 <code>K8S_MASK_NNNN</code>，然后才发给模型。模型返回后，本地再把占位符还原，落进 <code>AIExplanation</code>。</p>
+  <div class="table-wrap"><table><thead><tr><th>输入片段</th><th>出域前的样子</th><th>本地落库</th></tr></thead><tbody>
+    <tr><td><code>namespace: demo</code></td><td><code>namespace: K8S_MASK_0000</code></td><td>还原为 <code>demo</code></td></tr>
+    <tr><td><code>pod: demo-fault-crashloop-7d9f...</code></td><td><code>pod: K8S_MASK_0001</code></td><td>还原为原 Pod 名</td></tr>
+    <tr><td><code>10.244.1.7:8080</code></td><td><code>K8S_MASK_0002</code></td><td>还原为原 IP</td></tr>
+    <tr><td><code>token=abcd1234</code></td><td><code>token=K8S_MASK_0003</code></td><td>还原为原值（仅本地）</td></tr>
+  </tbody></table></div>
+  <p class="mini">调用日志只存 prompt 的 SHA-256 摘要，不存明文；审计 detail 也排除凭据字段。排障时不要把 Secret 内容打印到终端，更不要贴到工单。</p>
+  <h3>11.6 预算、熔断与调用链</h3>
+  <div class="table-wrap"><table><thead><tr><th>机制</th><th>默认值</th><th>行为</th></tr></thead><tbody>
+    <tr><td>预算</td><td>40 calls / 100k output tokens</td><td>每次调用前检查；超限置 <code>budget_exceeded</code>，<code>is_partial=true</code></td></tr>
+    <tr><td>熔断</td><td>连续 5 次失败，60 秒后半开</td><td>开路期间直接 NoAI；成功一次即闭合</td></tr>
+    <tr><td>调用审计</td><td>每次调用一条</td><td>model / prompt_digest / tokens / latency / result_code，只追加</td></tr>
+    <tr><td>审批超时</td><td>30 分钟</td><td>pending_approval 超时置 cancelled（BR-02）</td></tr>
+  </tbody></table></div>
+  <div class="code-block"><div class="code-head">bash · 看调用链</div><pre><code>curl -s -H "Authorization: Bearer $AUTH" \
+  "$BASE/ai/tasks/$TASK_ID/call-logs?limit=20" | python3 -m json.tool
+</code></pre></div>
+  <h3>11.7 AI 审批：UI/API 已具备，自动触发尚未接线</h3>
+  <p>AI 任务中心支持 <code>pending_approval</code> 行高亮、审批弹窗、批准/拒绝与超时取消；但当前服务层创建任务时没有把 <code>requires_approval</code> 置为 true 的业务触发点（只有数据库默认 false）。因此正常演示不会自动出现“待审批”任务。这是当前实现边界，不是权限或界面坏了。</p>
+  <details><summary>可选：用 SQL 构造一条待审批任务，验证审批 UI 与状态迁移</summary><div class="body">
+    <div class="code-block"><div class="code-head">bash · 先创建一个普通 AI 任务，拿到 ID</div><pre><code># 复用 §11.3 的 TASK_ID
+echo "$TASK_ID"
+</code></pre></div>
+    <div class="code-block"><div class="code-head">bash · 直接把任务改成 pending_approval</div><pre><code>kubectl -n huntai exec -it huntai-postgres-0 -- \
+  psql -U huntai -d huntai -c \
+  "UPDATE ai_tasks
+      SET status='pending_approval',
+          requires_approval=true,
+          approval_deadline_at=now() + interval '30 minutes',
+          finished_at=NULL
+    WHERE id=$TASK_ID;"
+</code></pre></div>
+    <ol class="mini"><li>刷新 AI 任务中心，任务行紫色高亮，侧栏“待审批”徽标增加。</li><li>点“审批”，弹窗展示只读工具清单、calls/tokens 预算、审批截止时间。</li><li>点“批准”：任务状态变为 <code>running</code>，写入 <code>approved_by</code> 与审计。</li><li>点“拒绝”：任务变为 <code>cancelled</code>，上下文保留。</li></ol>
+    <div class="callout note"><b>批准后不会自动重新入队</b><code>approve_task</code> 只把状态置为 <code>running</code>，当前没有再次 enqueue <code>ai.execute_task</code> 的代码路径。所以构造出来的任务会停在 running。这适合验证审批界面与状态迁移，不适合验证“批准后模型继续执行”。要观察真实模型执行，直接用普通 explain 任务。</div>
+    <div class="code-block"><div class="code-head">bash · 收尾：取消构造出来的任务</div><pre><code>curl -s -X POST "$BASE/ai/tasks/$TASK_ID/cancel" \
+  -H "Authorization: Bearer $AUTH" \
+  -H 'content-type: application/json' \
+  -d '{"reason":"审批演示结束，手工取消"}' | python3 -m json.tool
+</code></pre></div>
+  </div></details>
+  <h3>11.8 A2 事件调查 / A3 Workflow 生成（P3 薄层）</h3>
+  <div class="code-block"><div class="code-head">bash · A2：对事件发起调查</div><pre><code>curl -s -X POST "$BASE/incidents/$INCIDENT_ID/ai-investigation" \
+  -H "Authorization: Bearer $AUTH" | python3 -m json.tool
+</code></pre></div>
+  <p class="mini">A2 会创建 <code>investigate</code> 任务并执行；模型不可用时同样落 NoAI。事件详情页的“发起调查”按钮当前禁用并标 P3，API 可用。</p>
+  <div class="code-block"><div class="code-head">bash · A3：从自然语言生成 Workflow 草稿</div><pre><code>curl -s -X POST "$BASE/workflows/from-description" \
+  -H "Authorization: Bearer $AUTH" \
+  -H 'content-type: application/json' \
+  -d '{"description":"当订单服务 5xx 超过阈值时，先查 Pod 事件，再重启 Deployment，最后通知值班"}' \
+  | python3 -m json.tool
+</code></pre></div>
+  <div class="callout boundary"><b>Workflow 当前是 P3 薄层</b>后端有 Workflow CRUD、版本、AI 生成、审批、运行记录 API，但前端路由没有注册 <code>/workflows</code>（侧栏项点击会落到 404）；运行记录创建后停留在 <code>triggered</code>，没有执行引擎。所以本手册把 Workflow 列为“API 可验证、页面不可验收”，不纳入 14 项自动验收。</div>
+</section>
+
+<section id="s12">
+  <h2><span class="num">12</span>值班与升级：每次投递都有回执</h2>
+  <p class="sub">排班决定“找谁”，升级策略决定“多久没 Ack 就找下一级”，通知记录决定“到底投递了什么”。</p>
+  <h3>12.1 页面能做什么</h3>
+  <ul><li>周历展示主班/备班；今天高亮。</li><li>“临时顶班”支持填顶班人、被顶替人、事由，写进 <code>overrides</code> 并审计。</li><li>升级策略表展示级别、目标与渠道、超时。</li><li>编辑权：<code>admin</code> / <code>oncall_manager</code>；<code>sre</code> 只读。</li></ul>
+  <div class="callout note"><b>新环境里这一页可能是空的</b>seed 只创建用户、集群、Provider、规则，不创建排班和升级策略。你可以先跑一遍验收脚本（它会创建），或按下面的 API 手工创建。</div>
+  <h3>12.2 用 API 创建排班与两级升级策略</h3>
+  <div class="code-block"><div class="code-head">bash · 创建排班</div><pre><code>curl -s -X POST "$BASE/oncall-schedules" \
+  -H "Authorization: Bearer $AUTH" \
+  -H 'content-type: application/json' \
+  -d '{
+    "name":"platform-weekly",
+    "team":"platform",
+    "rotation_rules":{"members":["sre-tony","oncall-may"],"interval_days":7},
+    "calendar":{},
+    "overrides":[],
+    "enabled":true
+  }' | tee /tmp/schedule.json | python3 -m json.tool
+
+export SCHEDULE_ID=$(python3 -c 'import json; print(json.load(open("/tmp/schedule.json"))["id"])')
+echo "schedule=$SCHEDULE_ID"
+</code></pre></div>
+  <div class="code-block"><div class="code-head">bash · 创建升级策略</div><pre><code>curl -s -X POST "$BASE/escalation-policies" \
+  -H "Authorization: Bearer $AUTH" \
+  -H 'content-type: application/json' \
+  -d "{
+    \"name\":\"platform-2-level\",
+    \"schedule_id\":$SCHEDULE_ID,
+    \"levels\":[
+      {\"level\":1,\"target\":\"sre-tony\",\"channel\":\"im\",\"timeout_min\":5},
+      {\"level\":2,\"target\":\"oncall-may\",\"channel\":\"im\",\"timeout_min\":10}
+    ],
+    \"channel_fallbacks\":[\"im\"],
+    \"enabled\":true
+  }" | python3 -m json.tool
+</code></pre></div>
+  <h3>12.3 看通知记录</h3>
+  <div class="code-block"><div class="code-head">bash</div><pre><code>curl -s -H "Authorization: Bearer $AUTH" \
+  "$BASE/notification-records?limit=20" | python3 -m json.tool
+</code></pre></div>
+  <p class="mini">每条记录包含 channel、target、content_digest、status、ack_action、escalation_level。Ack 后会追加一条 <code>acked</code> 记录，而不是改旧行。</p>
+  <div class="callout boundary"><b>通知渠道是 dev 实现</b><code>DevImChannel</code> 只记 <code>sent</code>，不会真的发 IM/短信/电话。渠道降级链的结构已就绪（IM → 短信 → 电话），真实对接是 <code>[TBD-BIZ]</code>。所以不要期待手机收到消息；你要验证的是“记录、级别、Ack 停止升级”这些平台行为。</div>
+  <div class="callout why"><b>为什么要“只追加”通知记录？</b>值班场景最怕“到底通知了没有、谁 Ack 的、第几级”。如果每次状态变化覆盖旧行，就无法还原升级链。只追加让每次投递、降级、Ack 都成为独立事实，既能审计，也能在事故复盘时还原时间线。</div>
+</section>
+
+<section id="s13">
+  <h2><span class="num">13</span>权限、审计与管理后台</h2>
+  <p class="sub">前端只做展示控制，后端才是权威。用五个账号把 RBAC 矩阵跑一遍，再看审计是否留痕。</p>
+  <h3>13.1 五个账号与权限边界</h3>
+  <div class="table-wrap"><table><thead><tr><th>能力</th><th>admin</th><th>sre</th><th>oncall_manager</th><th>developer</th><th>viewer</th></tr></thead><tbody>
+    <tr><td>告警查看</td><td>Y</td><td>Y</td><td>Y</td><td>T（本团队）</td><td>N</td></tr>
+    <tr><td>告警 Ack / 关闭</td><td>Y / Y</td><td>Y / Y</td><td>N / N</td><td>T / N</td><td>N / N</td></tr>
+    <tr><td>告警转事件</td><td>Y</td><td>Y</td><td>N</td><td>T</td><td>N</td></tr>
+    <tr><td>候选确认/驳回</td><td>Y</td><td>Y</td><td>N</td><td>T</td><td>N</td></tr>
+    <tr><td>事件状态推进</td><td>Y</td><td>Y</td><td>N</td><td>T</td><td>N</td></tr>
+    <tr><td>巡检规则/策略</td><td>Y</td><td>Y</td><td>N</td><td>只读规则</td><td>N</td></tr>
+    <tr><td>Finding Ack</td><td>Y</td><td>Y</td><td>N</td><td>T</td><td>N</td></tr>
+    <tr><td>Finding 忽略/重开</td><td>Y</td><td>Y</td><td>N</td><td>N</td><td>N</td></tr>
+    <tr><td>AI 任务查看/审批</td><td>Y / Y</td><td>T / T</td><td>N / N</td><td>N / N</td><td>N / N</td></tr>
+    <tr><td>排班/升级策略</td><td>Y</td><td>只读</td><td>Y</td><td>N</td><td>N</td></tr>
+    <tr><td>集群/Provider/用户/审计</td><td>Y</td><td>部分只读</td><td>N</td><td>N</td><td>N</td></tr>
+  </tbody></table></div>
+  <p class="mini">Y=允许，N=拒绝，T=限本团队（行级过滤）。完整矩阵在 <code>src/huntai/domains/iam/permissions.py</code>，前端映射在 <code>frontend/src/shared/types/permissions.ts</code>；以后端为准。</p>
+  <h3>13.2 viewer：403 越权拦截</h3>
+  <div class="code-block"><div class="code-head">bash · 用 viewer 登录并访问告警</div><pre><code>VIEWER_AUTH=$(curl -s -X POST "$BASE/auth/token" \
+  -H 'content-type: application/json' \
+  -d '{"username":"viewer-guest","password":"your-demo-auth-password"}' \
+  | python3 -c 'import json,sys; print(json.load(sys.stdin)["access_token"])')
+
+curl -i -s -H "Authorization: Bearer $VIEWER_AUTH" "$BASE/alerts" | head -20
+</code></pre></div>
+  <div class="callout verify"><b>预期</b>HTTP 403，RFC 7807 problem+json，<code>title: Forbidden</code>。页面登录后侧栏几乎为空，访问 <code>/alerts</code> 会落到 403 页面。</div>
+  <h3>13.3 developer：团队行级过滤</h3>
+  <p><code>dev-lee</code> 属于 <code>platform</code> 团队。team 为 platform 的告警可见；team 为 order 的告警应不可见（详情返回 404，防探测）。</p>
+  <div class="code-block"><div class="code-head">bash · 制造一条 order 团队告警，再用 dev-lee 查询</div><pre><code>curl -s -X POST "$BASE/alerts/webhook/demo-alertmanager" \
+  -H 'content-type: application/json' \
+  -d '{
+    "status":"firing",
+    "severity":"warning",
+    "title":"订单团队告警（dev-lee 不应看到）",
+    "labels":{
+      "alertname":"DevTeamFilterDemo",
+      "namespace":"order-service",
+      "team":"order",
+      "cluster":"huntai-sre"
+    }
+  }'
+
+DEV_AUTH=$(curl -s -X POST "$BASE/auth/token" \
+  -H 'content-type: application/json' \
+  -d '{"username":"dev-lee","password":"your-demo-auth-password"}' \
+  | python3 -c 'import json,sys; print(json.load(sys.stdin)["access_token"])')
+
+curl -s -H "Authorization: Bearer $DEV_AUTH" "$BASE/alerts?limit=200" \
+  | python3 -c 'import json,sys; d=json.load(sys.stdin); print([(a["id"], a["title"]) for a in d["items"] if "order" in (a["title"] or "")])'
+</code></pre></div>
+  <p class="mini">预期列表里看不到这条 order 告警；如果直接请求它的详情，返回 404。注意 developer 对 findings 没有团队列，当前实现把 T 暂按放行全量（代码内有注释），这是已知边界。</p>
+  <h3>13.4 oncall_manager：可以编排班，但不能处置告警</h3>
+  <p class="mini">用 <code>oncall-may</code> 登录，能进“排班与升级”并编辑；告警与事件页只读，Ack/关闭按钮不可用；直接调 <code>POST /alerts/{id}/ack</code> 会 403。</p>
+  <h3>13.5 管理后台：能看什么、不能改什么</h3>
+  <div class="table-wrap"><table><thead><tr><th>卡片</th><th>页面行为</th><th>可用的 API</th></tr></thead><tbody>
+    <tr><td>集群与凭证</td><td>列表 + “探活”按钮；不展示凭证值</td><td><code>GET /clusters</code>、<code>POST /clusters/{id}/test-connection</code></td></tr>
+    <tr><td>Provider 接入</td><td>只读列表</td><td><code>GET/POST/PUT/DELETE /providers</code></td></tr>
+    <tr><td>巡检规则库</td><td>统计只读</td><td><code>GET/POST/PUT/DELETE /inspection-rules</code></td></tr>
+    <tr><td>AI 预算与模型路由</td><td>说明卡片，不可在页面修改</td><td>通过 Helm values / <code>07-configure-ai.sh</code></td></tr>
+    <tr><td>用户与角色</td><td>列表 + 创建用户</td><td><code>GET/POST/PUT /users</code>、<code>GET /roles</code></td></tr>
+    <tr><td>审计日志</td><td>最近 8 条只读</td><td><code>GET /audit-logs</code></td></tr>
+  </tbody></table></div>
+  <div class="code-block"><div class="code-head">bash · 探活 demo-prod</div><pre><code>CLUSTER_ID=$(curl -s -H "Authorization: Bearer $AUTH" "$BASE/clusters?limit=100" \
+  | python3 -c 'import json,sys; d=json.load(sys.stdin); print(next(c["id"] for c in d["items"] if c["name"]=="demo-prod"))')
+
+curl -s -X POST "$BASE/clusters/$CLUSTER_ID/test-connection" \
+  -H "Authorization: Bearer $AUTH" | python3 -m json.tool
+</code></pre></div>
+  <div class="callout why"><b>为什么页面只展示 secret_ref？</b>凭证值一旦进入数据库或页面，就会扩散到备份、日志、截图和工单。项目要求 credentials 只存 <code>secret_ref</code>，运行时从 env/密钥服务解析到内存，连接器只接受 readonly scope。所以“管理后台看不到密码”不是功能缺失，而是安全设计。</div>
+  <h3>13.6 审计日志：关键动作都能回溯</h3>
+  <div class="code-block"><div class="code-head">bash · 查最近审计</div><pre><code>curl -s -H "Authorization: Bearer $AUTH" \
+  "$BASE/audit-logs?limit=20" \
+  | python3 -c 'import json,sys
+d=json.load(sys.stdin)
+for x in d["items"]: print(x["created_at"], x["actor_type"], x["action"], x["resource_type"], x["resource_id"])'
+</code></pre></div>
+  <p class="mini">你应该能看到类似 <code>alert.acknowledge</code>、<code>alert.close</code>、<code>incident_candidate.confirm</code>、<code>finding.convert_to_alert</code>、<code>ai_task.complete</code>、<code>cluster.test_connection</code>、<code>oncall_schedule.create</code>、<code>notification.dispatch</code> 的记录。</p>
+</section>
+
+<section id="s14">
+  <h2><span class="num">14</span>演示业务、SSE 与前端小功能</h2>
+  <p class="sub">这一节把“平台之外”的演示也走一遍：React 控制台如何探测 Java/Python、如何触发 5xx、SSE 如何到达页面。</p>
+  <h3>14.1 演示控制台</h3>
+  <p>打开 <a href="http://127.0.0.1:18081">http://127.0.0.1:18081</a>，两张卡片分别显示 Java 订单服务与 Python 库存服务的实时响应。</p>
+  <div class="table-wrap"><table><thead><tr><th>操作</th><th>实际请求</th><th>预期</th></tr></thead><tbody>
+    <tr><td>查看 Java 服务</td><td><code>GET /java/api/orders</code></td><td>200，JSON 含 <code>java-order-service</code></td></tr>
+    <tr><td>查看 Python 服务</td><td><code>GET /python/api/inventory</code></td><td>200，JSON 含 <code>python-inventory-service</code></td></tr>
+    <tr><td>触发 Java 5xx</td><td><code>GET /java/api/orders/boom</code></td><td>500</td></tr>
+    <tr><td>触发 Python 5xx</td><td><code>GET /python/api/inventory/boom</code></td><td>500</td></tr>
+    <tr><td>触发慢请求</td><td><code>GET /.../slow?ms=1500</code></td><td>约 1.5 秒后返回</td></tr>
+  </tbody></table></div>
+  <div class="callout why"><b>为什么要放 Java + Python + React 三个工程？</b>它验证了“跨语言业务系统接入同一套 SRE 平台”的叙事：React 控制台同源反代两个服务，故障端点可重复触发；同时给巡检提供真实的 Deployment/Pod 对象。这部分不是平台核心，但没有它，演示就只剩静态数据。</div>
+  <h3>14.2 SSE 在页面上的表现</h3>
+  <ol><li>打开告警工作台，副标题显示“实时更新中”表示 SSE 已连接；断连时显示“10s 兜底轮询”。</li><li>用 §8.7 的终端 B 发一条告警，列表应在 1–2 秒内出现新行。</li><li>打开 AI 任务中心，触发一次 AI 解释；任务状态会随 <code>ai_task.updated</code> 推送更新。</li><li>如果模型连续失败触发熔断，顶部会出现“AI 能力已熔断（NoAI 模式）”横幅。</li></ol>
+  <p class="mini">SSE 端点支持 <code>topics=alerts,incidents,candidates,inspections,ai-tasks,notifications,system</code>；不传 topics 时订阅全部。developer 角色会按团队过滤事件。</p>
+  <h3>14.3 全局搜索与通知图标</h3>
+  <p class="mini">顶栏搜索当前收敛为“跳转告警工作台并带 <code>q</code> 参数”，不是跨实体全文检索；通知图标的数字是原型展示态，不随真实通知变化。这两项属于前端占位/展示优化，不影响后端能力验证。</p>
+</section>
+
+<section id="s15">
+  <h2><span class="num">15</span>排障速查：症状 → 先看什么 → 怎么修</h2>
+  <p class="sub">先按症状定位，不要一上来就重建集群。90% 的问题集中在 seed、端口、镜像加载和 AI 模式不一致。</p>
+  <div class="table-wrap"><table><thead><tr><th>症状</th><th>优先检查</th><th>处理</th></tr></thead><tbody>
+    <tr><td>8080 打不开</td><td><code>kubectl -n huntai get pods,svc</code>；<code>docker ps</code>；端口占用</td><td>修 Pod/端口；必要时重建集群</td></tr>
+    <tr><td>平台 Pod Pending</td><td><code>describe pod</code> Events；Docker 内存</td><td>调大 Docker 资源；删掉不可调度 Pod</td></tr>
+    <tr><td>登录提示用户不存在</td><td><code>kubectl -n huntai get jobs</code>；seed 日志</td><td>重跑 seed：删 Job 后 <code>helm upgrade --reuse-values</code></td></tr>
+    <tr><td>集群探活 disconnected</td><td><code>huntai-readonly-token</code> 是否非空；API/worker 环境变量</td><td>等 token 填充；重启 API 与 inspection worker</td></tr>
+    <tr><td>巡检 run failed</td><td>集群是否 connected；inspection worker 日志</td><td>先修探活；确认 ClusterRole 含 nodes list</td></tr>
+    <tr><td>巡检成功但没 finding</td><td>故障资源状态；策略是否勾选规则</td><td>等故障稳定；重跑；处理旧 open finding</td></tr>
+    <tr><td>告警一直 received</td><td>alert-pipeline worker；Redis/PG</td><td>看 worker 日志；seed 的 3 条告警本来就停在 received</td></tr>
+    <tr><td>SSE 没事件</td><td>是否先连接再触发；token；nginx buffering</td><td>重连；不要删除 <code>proxy_buffering off</code></td></tr>
+    <tr><td>AI 任务 failed + noai</td><td>是否部署模型；出域开关</td><td>预期行为；要真实模型按 §11.4 配置</td></tr>
+    <tr><td>DeepSeek 401/429/超时</td><td>Secret 是否存在；key 是否有效；节点能否出网</td><td>更新 key 后重跑 <code>07</code>；检查网络/配额</td></tr>
+    <tr><td>验收 AI 项失败</td><td><code>HUNTAI_AI_EGRESS_ENABLED</code> 与 <code>HUNTAI_AI_MODE</code> 是否一致</td><td>外部开启就用 <code>deepseek</code> 模式跑验收</td></tr>
+    <tr><td>改代码后 Pod 还是旧的</td><td>是否重新 build + kind load + rollout restart</td><td>同 tag 镜像不会自动拉取，必须 restart</td></tr>
+    <tr><td>Java 构建超时</td><td>是否有宿主机 <code>mvn</code></td><td>装 Maven，或让脚本回退 Dockerfile.build</td></tr>
+  </tbody></table></div>
+  <h3>15.1 一分钟定位命令</h3>
+  <div class="code-block"><div class="code-head">bash · 诊断包</div><pre><code>kubectl get nodes
+kubectl -n huntai get pods -o wide
+kubectl -n huntai get jobs,pvc
+kubectl -n demo get deploy,pods,pvc -o wide
+kubectl -n huntai logs deploy/huntai-api --tail=80
+kubectl -n huntai logs job/huntai-seed --tail=80
+kubectl -n huntai logs deploy/huntai-worker-inspection --tail=80
+kubectl -n huntai logs deploy/huntai-worker-ai --tail=80
+</code></pre></div>
+  <h3>15.2 收集诊断包（分享前先脱敏）</h3>
+  <div class="code-block"><div class="code-head">bash</div><pre><code>mkdir -p /tmp/huntai-diag
+kubectl -n huntai get all,pvc -o wide > /tmp/huntai-diag/platform.txt
+kubectl -n demo get all,pvc -o wide > /tmp/huntai-diag/demo.txt
+kubectl -n huntai describe pods > /tmp/huntai-diag/platform-pods.txt
+kubectl -n demo describe pods > /tmp/huntai-diag/demo-pods.txt
+docker ps --filter label=io.x-k8s.kind.cluster=huntai-sre > /tmp/huntai-diag/docker.txt
+</code></pre></div>
+  <div class="callout danger"><b>分享前检查</b>诊断包可能包含环境变量、镜像地址、事件与日志。不要包含真实 token、Secret 值、生产地址或 PII；必要时先手工删改。</div>
+</section>
+
+<section id="s16">
+  <h2><span class="num">16</span>清理与重建：把环境恢复干净</h2>
+  <p class="sub">演示结束后，至少关闭故障注入；要彻底释放资源，就卸载 release 并删除 kind 集群。</p>
+  <h3>16.1 只关闭故障注入</h3>
+  <div class="code-block"><div class="code-head">bash</div><pre><code>helm upgrade huntai-demo deploy/helm/huntai-demo -n demo --reuse-values \
+  --set faults.enabled=false
+</code></pre></div>
+  <h3>16.2 卸载 release 并删除集群</h3>
+  <div class="code-block"><div class="code-head">bash</div><pre><code>bash deploy/scripts/06-teardown.sh
+</code></pre></div>
+  <div class="code-block"><div class="code-head">bash · 只删 release，保留集群</div><pre><code>KEEP_CLUSTER=1 bash deploy/scripts/06-teardown.sh
+</code></pre></div>
+  <p class="mini">卸载 release 会删除 Deployment/Service/PVC 等资源；kind 集群删除后，PostgreSQL 数据、镜像加载状态、NodePort 映射都会消失。下次重新从 §03 开始。</p>
+  <h3>16.3 代码改动后的最小重建</h3>
+  <div class="code-block"><div class="code-head">bash · 只改后端</div><pre><code>docker build -t huntai-sre:dev .
+kind load docker-image huntai-sre:dev --name huntai-sre
+kubectl -n huntai rollout restart deploy/huntai-api
+kubectl -n huntai rollout restart deploy -l app.kubernetes.io/part-of=huntai-sre
+</code></pre></div>
+  <div class="code-block"><div class="code-head">bash · 只改前端</div><pre><code>docker build -t huntai-web:dev frontend
+kind load docker-image huntai-web:dev --name huntai-sre
+kubectl -n huntai rollout restart deploy/huntai-web
+</code></pre></div>
+  <p class="mini"><code>imagePullPolicy: IfNotPresent</code> 意味着同 tag 重新 load 后必须 <code>rollout restart</code>，否则 Pod 还会用旧镜像。</p>
+</section>
+
+<section id="s17">
+  <h2><span class="num">17</span>功能边界与验收口径</h2>
+  <p class="sub">把“已实现、部分实现、仅 API、未纳入验收”分清楚，避免把边界当缺陷。</p>
+  <h3>17.1 当前实现边界</h3>
+  <div class="table-wrap"><table><thead><tr><th>项</th><th>当前状态</th><th>怎么验证 / 怎么理解</th></tr></thead><tbody>
+    <tr><td>seed 的 3 条演示告警</td><td>保持 <code>received</code></td><td>seed 阶段使用 no-op enqueue；用 webhook 或 CronJob 观察完整管道</td></tr>
+    <tr><td>关闭故障注入后的历史数据</td><td>finding/告警保留</td><td>审计设计；不会自动 resolved</td></tr>
+    <tr><td>巡检页面创建/触发策略</td><td>页面只展示与处置 findings</td><td>用 API 创建策略/触发 run（§9.2）</td></tr>
+    <tr><td>AI 审批自动触发</td><td>UI/API 有，服务层未自动置 pending_approval</td><td>可用 SQL 构造验证（§11.7）；批准后不会自动重新入队</td></tr>
+    <tr><td>事件复盘页面</td><td>页面占位</td><td>API 可读写（§10.5）</td></tr>
+    <tr><td>A2 事件调查入口</td><td>按钮禁用标 P3</td><td>API 可用（§11.8）</td></tr>
+    <tr><td>Workflow 页面</td><td>路由未注册</td><td>API 薄层可 CRUD；运行记录不执行</td></tr>
+    <tr><td>通知渠道</td><td>DevImChannel 只记 sent</td><td>真实 IM/SMS/电话是 <code>[TBD-BIZ]</code></td></tr>
+    <tr><td>管理后台 Provider/规则/集群</td><td>页面只读或仅探活</td><td>API 支持 CRUD 的部分见 §18</td></tr>
+    <tr><td>全局搜索</td><td>只跳告警并带 q 参数</td><td>不是跨实体全文检索</td></tr>
+    <tr><td>通知图标数字</td><td>原型展示态</td><td>不随真实通知变化</td></tr>
+    <tr><td>developer 的 findings 团队边界</td><td>T 暂按放行全量</td><td>findings 无团队列，代码内有注释</td></tr>
+    <tr><td>Webhook 认证</td><td>demo Provider 未配 token</td><td>生产必须启用 Provider 令牌/签名</td></tr>
+    <tr><td>kind 集群</td><td>单 control-plane，非 HA</td><td>控制面故障不在演示范围</td></tr>
+  </tbody></table></div>
+  <h3>17.2 验收口径建议</h3>
+  <ul><li><strong>自动验收 14/14</strong> 是“环境与主链路可用”的基线，不覆盖通知外呼、复盘页面、Workflow。</li><li><strong>手工自测</strong> 以“页面上能完成一次真实处置 + API 能拿到对应证据”为准，不以截图数量为准。</li><li><strong>AI 验收</strong> 先声明模式：NoAI 还是 DeepSeek；两种模式的断言相反。</li><li><strong>安全验收</strong> 看三件事：页面不回显凭证、viewer 403、审计有记录。</li><li><strong>数据验收</strong> 看时间线与状态迁移，尤其是候选确认、事件关闭、AI 调用链。</li></ul>
+  <h3>17.3 Rollback 与恢复</h3>
+  <div class="code-block"><div class="code-head">bash</div><pre><code>helm list -A
+helm history huntai -n huntai
+helm rollback huntai 1 -n huntai
+
+helm history huntai-demo -n demo
+helm rollback huntai-demo 1 -n demo
+</code></pre></div>
+  <p class="mini">演示环境没有生产级备份；更换 <code>maskKey</code> 后旧 AI 脱敏映射无法解密。需要干净数据时，直接清库重建更简单。</p>
+</section>
+
+<section id="s18">
+  <h2><span class="num">18</span>API 速查：手工测试的备用入口</h2>
+  <p class="sub">页面没暴露的操作，用这些接口补；所有受保护接口都要 <code>Authorization: Bearer $AUTH</code>。</p>
+  <h3>18.1 基础约定</h3>
+  <div class="table-wrap"><table><thead><tr><th>项</th><th>值</th></tr></thead><tbody>
+    <tr><td>Base URL</td><td><code>http://127.0.0.1:8080/api/v1</code></td></tr>
+    <tr><td>健康检查</td><td><code>GET /healthz</code>（不在 <code>/api/v1</code> 下）</td></tr>
+    <tr><td>认证</td><td><code>POST /auth/token</code>，body <code>{"username","password"}</code></td></tr>
+    <tr><td>Token 有效期</td><td>默认 720 分钟</td></tr>
+    <tr><td>错误格式</td><td>RFC 7807 <code>application/problem+json</code>，含 <code>title/status/detail/code/trace_id</code></td></tr>
+    <tr><td>分页</td><td><code>offset</code> / <code>limit</code>，返回 <code>{items,total,offset,limit}</code></td></tr>
+    <tr><td>OpenAPI</td><td><code>docs/04-api/openapi.yaml</code></td></tr>
+  </tbody></table></div>
+  <h3>18.2 端点分组</h3>
+  <div class="table-wrap"><table><thead><tr><th>分组</th><th>方法与路径</th><th>用途</th></tr></thead><tbody>
+    <tr><td>认证</td><td><code>POST /auth/token</code>、<code>GET /users/me</code>、<code>GET /users</code>、<code>POST /users</code>、<code>PUT /users/{id}</code>、<code>GET /roles</code></td><td>登录、用户与角色</td></tr>
+    <tr><td>审计</td><td><code>GET /audit-logs</code></td><td>只追加审计查询</td></tr>
+    <tr><td>集群</td><td><code>GET/POST /clusters</code>、<code>PUT/DELETE /clusters/{id}</code>、<code>POST /clusters/{id}/test-connection</code></td><td>集群接入与探活</td></tr>
+    <tr><td>Provider</td><td><code>GET/POST /providers</code>、<code>PUT/DELETE /providers/{id}</code></td><td>告警源管理</td></tr>
+    <tr><td>告警</td><td><code>POST /alerts/webhook/{provider}</code>、<code>GET /alerts</code>、<code>GET /alerts/{id}</code>、<code>POST /alerts/{id}/ack|close|convert-to-incident|suppress-suggestion</code></td><td>接入与处置</td></tr>
+    <tr><td>告警解释</td><td><code>GET /alerts/{id}/explanations</code></td><td>巡检转告警后的 AI 解释</td></tr>
+    <tr><td>富化规则</td><td><code>GET/POST /enrichment-rules</code>、<code>PUT/DELETE /enrichment-rules/{id}</code></td><td>团队/影响面富化</td></tr>
+    <tr><td>关联规则</td><td><code>GET/POST /correlation-rules</code>、<code>PUT/DELETE /correlation-rules/{id}</code></td><td>候选/自动归并</td></tr>
+    <tr><td>维护窗口</td><td><code>GET/POST /maintenance-windows</code></td><td>BR-07 抑制</td></tr>
+    <tr><td>候选</td><td><code>GET /incident-candidates</code>、<code>POST /incident-candidates/{id}/confirm|reject</code></td><td>人工立项</td></tr>
+    <tr><td>事件</td><td><code>GET/POST /incidents</code>、<code>GET /incidents/{id}</code>、<code>POST /incidents/{id}/acknowledge|mitigate|resolve|close|cancel</code></td><td>6 态状态机</td></tr>
+    <tr><td>事件扩展</td><td><code>POST /incidents/{id}/notes</code>、<code>POST /incidents/{id}/status-page/sync|undo</code>、<code>GET/PUT /incidents/{id}/postmortem</code>、<code>POST /incidents/{id}/ai-investigation</code></td><td>时间线、状态页、复盘、A2</td></tr>
+    <tr><td>巡检规则</td><td><code>GET/POST /inspection-rules</code>、<code>PUT/DELETE /inspection-rules/{id}</code></td><td>规则库</td></tr>
+    <tr><td>巡检策略</td><td><code>GET/POST /inspection-policies</code>、<code>PUT/DELETE /inspection-policies/{id}</code>、<code>POST /inspection-policies/{id}/run</code></td><td>调度与手动执行</td></tr>
+    <tr><td>巡检执行</td><td><code>GET /inspection-runs</code>、<code>GET /inspection-runs/{id}</code>、<code>GET /findings</code></td><td>run 与 findings</td></tr>
+    <tr><td>Finding</td><td><code>POST /findings/{id}/ack|ignore|reopen|explain</code></td><td>处置与 AI 解释</td></tr>
+    <tr><td>AI</td><td><code>GET /ai/tasks</code>、<code>GET /ai/tasks/{id}</code>、<code>POST /ai/tasks/{id}/approve|cancel</code>、<code>GET /ai/tasks/{id}/call-logs</code></td><td>任务、审批、调用链</td></tr>
+    <tr><td>值班</td><td><code>GET/POST /oncall-schedules</code>、<code>PUT/DELETE /oncall-schedules/{id}</code>、<code>GET/POST /escalation-policies</code>、<code>PUT/DELETE /escalation-policies/{id}</code></td><td>排班与升级</td></tr>
+    <tr><td>通知</td><td><code>GET /notification-records</code></td><td>投递留痕</td></tr>
+    <tr><td>Workflow</td><td><code>GET/POST /workflows</code>、<code>POST /workflows/{id}/versions|approve</code>、<code>POST /workflows/from-description</code>、<code>POST /workflow-runs</code>、<code>GET /workflow-runs/{id}</code></td><td>P3 薄层</td></tr>
+    <tr><td>SSE</td><td><code>GET /realtime/stream?topics=alerts</code></td><td>实时事件</td></tr>
+  </tbody></table></div>
+  <h3>18.3 安全提醒</h3>
+  <div class="callout danger"><b>不要把真实凭据放进示例</b>手册中的 <code>your-demo-auth-password</code>、<code>sk-xxxx</code> 都是占位符。真实 key 只放 <code>.env</code> 或密钥管理服务；不要写进 README、脚本、命令行历史、截图或工单。如果怀疑 key 泄漏，先轮换 key，再检查审计与调用日志。</div>
+</section>
+
+<footer><strong>KubeLantern 全功能自测手册 · v1.0</strong><br />适用环境：本地 kind 演示集群（1 control-plane + 2 worker）。关键接口路径与默认阈值已对照当前仓库代码核对。<br />参考：<code>DEVELOPMENT.md</code>、<code>deploy/README.md</code>、<code>docs/06-release/01-kind-demo-cluster.md</code>、<code>docs/06-release/02-build-and-deploy.md</code>、<code>docs/06-release/03-feature-acceptance.md</code>、<code>docs/06-release/04-troubleshooting.md</code>、<code>docs/03-tech-design/02-architecture.md</code>。<br />演示口令与故障注入仅用于本地学习，禁止用于生产。</footer>
+</div>
+</main>
+
+<script>
+(function(){
+  var mobileLinks=document.getElementById('mobileLinks');
+  if(mobileLinks){
+    document.querySelectorAll('.side nav a').forEach(function(a){
+      var c=a.cloneNode(true);
+      c.addEventListener('click',function(){var d=document.querySelector('.mobile-nav');if(d)d.open=false});
+      mobileLinks.appendChild(c);
+    });
+  }
+
+  document.querySelectorAll('.code-block').forEach(function(block){
+    var btn=document.createElement('button');btn.className='copy-btn';btn.type='button';btn.textContent='复制';btn.setAttribute('aria-label','复制代码');
+    btn.addEventListener('click',function(){
+      var code=block.querySelector('code');var text=code?code.innerText:'';
+      function done(){btn.textContent='已复制';setTimeout(function(){btn.textContent='复制'},1500)}
+      function fallback(){var ta=document.createElement('textarea');ta.value=text;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();try{document.execCommand('copy');done()}catch(e){btn.textContent='复制失败'}document.body.removeChild(ta)}
+      if(navigator.clipboard&&window.isSecureContext){navigator.clipboard.writeText(text).then(done).catch(fallback)}else{fallback()}
+    });
+    block.appendChild(btn);
+  });
+
+  var progress=document.getElementById('readingProgress');
+  function updateProgress(){var h=document.documentElement;var max=h.scrollHeight-h.clientHeight;var ratio=max>0?(h.scrollTop||document.body.scrollTop)/max:0;progress.style.width=(ratio*100).toFixed(2)+'%'}
+  window.addEventListener('scroll',updateProgress,{passive:true});window.addEventListener('resize',updateProgress);updateProgress();
+
+  var links=Array.prototype.slice.call(document.querySelectorAll('.side nav a'));
+  var sections=links.map(function(a){return document.getElementById(a.getAttribute('href').slice(1))}).filter(Boolean);
+  if('IntersectionObserver' in window){
+    var observer=new IntersectionObserver(function(entries){entries.forEach(function(entry){if(!entry.isIntersecting)return;var id=entry.target.id;links.forEach(function(a){a.classList.toggle('on',a.getAttribute('href')==='#'+id)})})},{rootMargin:'-15% 0px -75% 0px',threshold:0});
+    sections.forEach(function(s){observer.observe(s)});
+  }
+
+  var KEY='kubelantern-self-test-v1';
+  var boxes=Array.prototype.slice.call(document.querySelectorAll('[data-check]'));
+  var bar=document.getElementById('progressBar');var text=document.getElementById('progressText');
+  function load(){try{return JSON.parse(localStorage.getItem(KEY)||'[]')}catch(e){return[]}}
+  function save(ids){try{localStorage.setItem(KEY,JSON.stringify(ids))}catch(e){}}
+  function render(){var checked=boxes.filter(function(b){return b.checked});var pct=boxes.length?(checked.length/boxes.length)*100:0;if(bar)bar.style.width=pct.toFixed(1)+'%';if(text)text.textContent=checked.length+' / '+boxes.length;save(checked.map(function(b){return b.getAttribute('data-check')}))}
+  var saved=load();boxes.forEach(function(b){b.checked=saved.indexOf(b.getAttribute('data-check'))!==-1;b.addEventListener('change',render)});render();
+})();
+</script>
+</body>
+</html>

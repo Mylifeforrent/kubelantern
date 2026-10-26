@@ -267,6 +267,7 @@ bash deploy/scripts/05-run-acceptance.sh
 - [整体架构设计（HLD）](docs/03-tech-design/02-architecture.md)
 - [API 契约（OpenAPI 3.1）](docs/04-api/README.md)
 - [功能验收与手工体验](docs/06-release/03-feature-acceptance.md)
+- [全功能自测操作手册（HTML）](docs/06-release/05-self-test-handbook.html)
 - [开发与部署指南](DEVELOPMENT.md)
 
 > 代码中的 Python 包名与部分历史文档仍使用内部代号 `huntai`，属于实现细节；对外产品名为 **KubeLantern**。

@@ -46,6 +46,7 @@
 | `06-release/02-build-and-deploy.md` | 镜像构建与 Helm 部署 | accepted | 2026-10-25 |
 | `06-release/03-feature-acceptance.md` | 功能验收与手工体验 | accepted | 2026-10-25 |
 | `06-release/04-troubleshooting.md` | 排障与清理 | accepted | 2026-10-25 |
+| `06-release/05-self-test-handbook.html` | 全功能自测操作手册（环境、kind 集群、故障注入、告警/巡检/事件/AI/RBAC 与架构原理） | accepted | 2026-10-26 |
 
 ## 3. 命名与编号规范
 

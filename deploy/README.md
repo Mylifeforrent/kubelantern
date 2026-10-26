@@ -63,6 +63,7 @@ deploy/
 2. [构建与部署](../docs/06-release/02-build-and-deploy.md)
 3. [功能验收与手工体验](../docs/06-release/03-feature-acceptance.md)
 4. [排障与清理](../docs/06-release/04-troubleshooting.md)
+5. [全功能自测操作手册（HTML）](../docs/06-release/05-self-test-handbook.html)
 
 ## 3. 常用操作
 
