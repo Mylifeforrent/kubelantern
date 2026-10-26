@@ -51,6 +51,7 @@ API      : http://127.0.0.1:8080/api/v1
 | `FAULT_SETTLE_SECONDS` | `45` | 跳过 kubectl 检查时等待故障的时间 |
 | `KIND_CLUSTER_NAME` | `huntai-sre` | kind 集群名 |
 | `DEMO_NAMESPACE` | `demo` | 演示命名空间 |
+| `HUNTAI_AI_MODE` | `noai` | 设为 `deepseek` 时断言外部模型任务 `completed` |
 
 ## 2. 自动验收覆盖了什么
 
@@ -64,7 +65,7 @@ API      : http://127.0.0.1:8080/api/v1
 | 6 | 告警工作台 | 误报建议、ACK、关闭 | `accepted=true`、`acknowledged_at` 写入、关闭后 `status=resolved` |
 | 7 | 事件闭环 | BR-04 关联 → 候选 → 确认 | 两条同 namespace 告警生成候选，确认后 incident.source=correlation |
 | 8 | 巡检 | 快照、规则、finding、BR-09 | 命中 5 类故障规则，且 finding 已转告警 |
-| 9 | AI 治理 | NoAI 降级、预算/调用留痕 | 未部署模型时任务 `failed` + `noai`，call-log 为 error |
+| 9 | AI 治理 | NoAI 降级 / DeepSeek 外部调用、预算/调用留痕 | 默认未部署模型时 `failed` + `noai`；`HUNTAI_AI_MODE=deepseek` 时 `completed`、call-log 为 ok、解释落库 |
 | 10 | SSE | 实时事件通道 | 订阅后收到 `alert.updated` |
 | 11 | 值班 | P2 排班/升级策略 | 排班与两级升级策略创建、列表可读 |
 | 12 | 演示业务 | React → Java/Python | 控制台 200、两个服务 JSON、5xx 端点返回 500 |
@@ -170,14 +171,33 @@ curl -s -X POST http://127.0.0.1:8080/api/v1/correlation-rules \
 
 再向 `manual-demo` namespace 发两条不同 `alertname` 的告警，进入「候选事件」页确认；确认后生成事件，详情页可见关联告警与时间线。
 
-### 3.5 AI 任务：NoAI 降级
+### 3.5 AI 任务：NoAI 降级或 DeepSeek 外部调用
+
+**默认（未配置外部模型）**
 
 1. 在巡检 finding 上点「AI 解释」；
 2. 进入「AI 任务中心」；
 3. 预期任务最终为 `failed`，错误包含 `noai: 模型不可用或熔断开路`；
 4. 打开任务详情，call-log 有一条 `result_code=error`。
 
-这是设计内的 NoAI 降级（ADR-0005），因为本环境没有部署 Ollama。若要接真实模型，把 `HUNTAI_AI_LOCAL_ENDPOINT` 指向可用的 Ollama/vLLM 服务并重启 API/worker。
+这是设计内的 NoAI 降级（ADR-0005），因为本环境没有部署 Ollama。
+
+**配置 DeepSeek 后（推荐用于验证真实模型链路）**
+
+```bash
+# .env 中填写 HUNTAI_AI_EXTERNAL_KEY，然后：
+bash deploy/scripts/07-configure-ai.sh
+HUNTAI_AI_MODE=deepseek bash deploy/scripts/05-run-acceptance.sh
+```
+
+预期：
+
+- 任务最终 `completed`；
+- `calls_used=1`、`tokens_used>0`；
+- call-log 的 `model=external`、`result_code=ok`；
+- 告警解释接口返回 `output.diagnosis` 非空，且不含 `noai`。
+
+> key 只保存在 `.env` 和 `huntai/huntai-ai-secret`，不会进入 values、Chart 或日志。
 
 ### 3.6 值班与权限
 
@@ -206,7 +226,7 @@ curl -s -X POST http://127.0.0.1:8080/api/v1/correlation-rules \
 | BR-09 finding 转告警 | P0 | ✅ | ✅ | warning/critical |
 | SSE 实时事件 | P0 | ✅ | ✅ | nginx 关闭缓冲 |
 | Web SPA 与 API 同源代理 | P0 | ✅ | ✅ | |
-| AI 任务 / NoAI 降级 / 调用留痕 | P1 | ✅ | ✅ | 未部署模型 |
+| AI 任务 / NoAI 降级 / DeepSeek 外部调用 | P1 | ✅ | ✅ | 默认 NoAI；配置 key 后走 external |
 | 关联规则 / 候选事件 / 确认转事件 | P2 | ✅ | ✅ | |
 | 值班排班 / 升级策略 CRUD | P2 | ✅ | ✅ | 真实 IM 渠道为 dev 直通 |
 | 通知记录 / 升级执行 | P2 | — | 可观察 | 验收未断言外呼 |
@@ -217,7 +237,7 @@ curl -s -X POST http://127.0.0.1:8080/api/v1/correlation-rules \
 ## 5. 已知边界
 
 1. **seed 的 3 条演示告警不会自动走管道**：`seed.py` 在 `--with-alerts` 时使用 no-op enqueue，因此它们是 `received` 状态；请用 CronJob 或手工 webhook 观察完整管道。
-2. **NoAI 是预期行为**：没有 Ollama 时 AI 任务失败并落 `noai`，不是环境故障。
+2. **NoAI 是默认预期行为**：没有 Ollama 且未配置外部模型时 AI 任务失败并落 `noai`；配置 DeepSeek 后应变为 `completed`。若 DeepSeek 模式仍失败，见 `04-troubleshooting.md` §7。
 3. **关闭 faults 不会自动关闭历史 finding/告警**：它们保留审计；需要新的巡检才不会对已删资源产生新 finding。
 4. **通知渠道是 dev 实现**：`DevImChannel` 只记 sent，不真正发 IM/SMS。
 5. **单控制面**：kind 集群不是高可用；控制面故障不在演示范围。

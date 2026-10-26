@@ -29,7 +29,12 @@ config:
   # 演示集群默认不部署 Ollama，AI 任务会走 NoAI 降级（这是可验收行为）。
   aiLocalEndpoint: http://127.0.0.1:11434
   aiLocalModel: llama3.1
+  # 外部 OpenAI 兼容模型（如 DeepSeek）。默认关闭；由 07-configure-ai.sh
+  # 读取 .env 后创建 Secret 并 --set aiEgressEnabled=true 开启。
   aiEgressEnabled: "false"
+  aiExternalUrl: https://api.deepseek.com/v1
+  aiExternalModel: deepseek-chat
+  aiExternalKeyRef: "env:HUNTAI_AI_EXTERNAL_KEY"
   sseHeartbeatSeconds: "15"
 
 postgres:
@@ -91,6 +96,11 @@ web:
     limits:
       cpu: 200m
       memory: 128Mi
+
+ai:
+  # 由 deploy/scripts/07-configure-ai.sh 从本地 .env 创建；禁止把 key 写进 values。
+  externalKeySecretName: huntai-ai-secret
+  externalKeySecretKey: apiKey
 
 # 只读 ServiceAccount：巡检连接器只允许只读凭证（BR-02）。
 readonlyRBAC:

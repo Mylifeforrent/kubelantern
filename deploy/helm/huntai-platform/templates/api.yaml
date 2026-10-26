@@ -89,6 +89,12 @@ spec:
               value: {{ .Values.config.aiLocalEndpoint | quote }}
             - name: HUNTAI_AI_LOCAL_MODEL
               value: {{ .Values.config.aiLocalModel | quote }}
+            - name: HUNTAI_AI_EXTERNAL_URL
+              value: {{ .Values.config.aiExternalUrl | quote }}
+            - name: HUNTAI_AI_EXTERNAL_MODEL
+              value: {{ .Values.config.aiExternalModel | quote }}
+            - name: HUNTAI_AI_EXTERNAL_KEY_REF
+              value: {{ .Values.config.aiExternalKeyRef | quote }}
             - name: HUNTAI_AI_EGRESS_ENABLED
               value: {{ .Values.config.aiEgressEnabled | quote }}
             - name: HUNTAI_SSE_HEARTBEAT_SECONDS

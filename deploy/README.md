@@ -99,7 +99,39 @@ bash deploy/scripts/06-teardown.sh
 - **AI 默认 NoAI**：不部署 Ollama；AI 任务会以 `failed` + `noai` 留痕，这是设计内的降级路径，不是故障。
 - **演示口令是占位符**：`values.yaml` 中的口令仅用于本地，生产必须改用密钥管理。
 
-## 5. 安全与提交
+## 5. 使用 DeepSeek 外部模型（可选）
+
+默认 AI 走本地 Ollama；未部署本地模型时任务会落 `NoAI`。如果要接 DeepSeek：
+
+1. 在仓库根 `.env` 填写（仅本地文件，已被 gitignore）：
+
+   ```dotenv
+   HUNTAI_AI_EGRESS_ENABLED=true
+   HUNTAI_AI_EXTERNAL_URL=https://api.deepseek.com/v1
+   HUNTAI_AI_EXTERNAL_MODEL=deepseek-chat
+   HUNTAI_AI_EXTERNAL_KEY_REF=env:HUNTAI_AI_EXTERNAL_KEY
+   HUNTAI_AI_EXTERNAL_KEY=<你的 DeepSeek key>
+   ```
+
+2. 创建集群 Secret 并开启外部路由：
+
+   ```bash
+   bash deploy/scripts/07-configure-ai.sh
+   ```
+
+   脚本从 `.env` 读取 key，创建 `huntai/huntai-ai-secret`，再执行 Helm upgrade；
+   key 不会打印到终端，也不会写入 values/Chart。
+
+3. 用 DeepSeek 模式验收：
+
+   ```bash
+   HUNTAI_AI_MODE=deepseek bash deploy/scripts/05-run-acceptance.sh
+   ```
+
+   AI 步骤应显示 `status=completed provider=external`，并能在 AI 任务详情看到
+   `ai_explanations` 中的诊断文本。
+
+## 6. 安全与提交
 
 ```bash
 # 手工扫描新增文件（仓库护栏）

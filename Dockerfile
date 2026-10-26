@@ -9,6 +9,8 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 COPY pyproject.toml uv.lock ./
 # pyproject 的 readme 指向 frontend/README.md；构建元数据需要该文件存在。
 COPY frontend/README.md ./frontend/README.md
+# 先只安装第三方依赖；源码改动时只需重跑最后一次 sync（避免重复下载依赖）。
+RUN uv sync --locked --no-dev --no-install-project
 COPY src ./src
 RUN uv sync --locked --no-dev
 # 迁移在 API 的 initContainer 执行；镜像必须携带 alembic 配置与迁移脚本。

@@ -1,10 +1,36 @@
-"""单元测试：AI 网关纯函数（脱敏往返 / 预算 / 熔断）。"""
+"""单元测试：AI 网关纯函数（脱敏往返 / 预算 / 熔断 / 路由）。"""
 
 import pytest
 
-from huntai.gateway import sanitizer
+from huntai.core.config import Settings
+from huntai.gateway import router, sanitizer
 from huntai.gateway.budget import check_before_call
 from huntai.gateway.circuit import CircuitBreaker
+
+
+def test_route_prefers_external_only_when_egress_fully_configured():
+    external = Settings(
+        ai_egress_enabled=True,
+        ai_external_url="https://api.deepseek.com/v1",
+        ai_external_model="deepseek-chat",
+        ai_external_key_ref="env:HUNTAI_AI_EXTERNAL_KEY",
+    )
+    assert router.route("explain", external) == "external"
+
+    no_egress = Settings(
+        ai_egress_enabled=False,
+        ai_external_url="https://api.deepseek.com/v1",
+        ai_external_key_ref="env:HUNTAI_AI_EXTERNAL_KEY",
+    )
+    assert router.route("explain", no_egress) == "local"
+
+    missing_url = Settings(
+        ai_egress_enabled=True,
+        ai_external_url=None,
+        ai_external_key_ref="env:HUNTAI_AI_EXTERNAL_KEY",
+    )
+    assert router.route("explain", missing_url) == "local"
+    assert router.route("explain") == "local"
 
 
 def test_sanitize_masks_known_terms_and_restore():

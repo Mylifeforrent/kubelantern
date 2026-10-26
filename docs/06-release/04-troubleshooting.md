@@ -268,6 +268,8 @@ curl -N -H "Authorization: Bearer $TOKEN" \
 
 ## 7. AI 任务
 
+### 7.1 默认 NoAI
+
 看到：
 
 ```text
@@ -275,7 +277,45 @@ status = failed
 error  = noai: 模型不可用或熔断开路（ADR-0005）
 ```
 
-这是**预期**：本环境没有 Ollama。若要接真实模型：
+这是**默认预期**：本环境没有 Ollama，且未配置外部模型。若要接真实模型：
+
+- 本地 Ollama：把 `config.aiLocalEndpoint` 指向 Ollama 服务并重启 API/AI worker；
+- 外部 OpenAI 兼容模型：按 `02-build-and-deploy.md` §6 配置 DeepSeek。
+
+### 7.2 配置 DeepSeek 后仍失败
+
+先确认 Secret 和 worker 环境：
+
+```bash
+kubectl -n huntai get secret huntai-ai-secret
+kubectl -n huntai get deploy huntai-worker-ai \
+  -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="HUNTAI_AI_EGRESS_ENABLED")].value}{"\n"}'
+
+# 在 AI worker 内验证网络与 key（不打印 key）
+kubectl -n huntai exec deploy/huntai-worker-ai -- python -c \
+'import os, httpx
+r = httpx.get("https://api.deepseek.com/v1/models", headers={"authorization": "Bearer " + os.environ.get("HUNTAI_AI_EXTERNAL_KEY", "")}, timeout=20)
+print("deepseek status:", r.status_code)'
+```
+
+| 现象 | 处理 |
+|---|---|
+| Secret 不存在或 `HUNTAI_AI_EGRESS_ENABLED=false` | 重新执行 `bash deploy/scripts/07-configure-ai.sh` |
+| `deepseek status: 401` | `.env` 中 key 无效/过期；更新后重跑 `07` |
+| `deepseek status: 429` | 触发限流；稍后重试或检查账户配额 |
+| 连接超时 / DNS 失败 | kind 节点无法出网；检查 Docker 网络、代理或公司网络策略 |
+| `HUNTAI_AI_EXTERNAL_KEY` 为空 | Secret 已创建但 AI worker 未重启；`kubectl -n huntai rollout restart deploy/huntai-worker-ai` |
+
+查看 worker 日志：
+
+```bash
+kubectl -n huntai logs deploy/huntai-worker-ai --tail=100
+```
+
+AI 任务在数据库中的状态会保留；修复配置后重新对 finding 点「AI 解释」即可。key 只会出现在
+`.env` 与集群 Secret 中，排障时不要把 Secret 内容打印到终端或贴到工单。
+
+### 7.3 使用本地 Ollama
 
 ```bash
 helm upgrade huntai deploy/helm/huntai-platform -n huntai --reuse-values \

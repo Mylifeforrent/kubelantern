@@ -199,7 +199,51 @@ python3 -c "import base64,os;print(base64.urlsafe_b64encode(os.urandom(32)).deco
 
 > 更换 `maskKey` 后，旧的 `ai_mask_mappings.encrypted_original` 无法解密。演示环境可直接清库重建；生产必须走密钥轮换方案。
 
-## 6. 代码改动后的重建
+## 6. 外部 AI（DeepSeek）
+
+默认 `config.aiEgressEnabled=false`，AI 任务走本地 Ollama 或 NoAI。启用外部 OpenAI 兼容模型：
+
+1. 在仓库根 `.env` 填写（`.env` 已被 gitignore，禁止提交）：
+
+   ```dotenv
+   HUNTAI_AI_EGRESS_ENABLED=true
+   HUNTAI_AI_EXTERNAL_URL=https://api.deepseek.com/v1
+   HUNTAI_AI_EXTERNAL_MODEL=deepseek-chat
+   HUNTAI_AI_EXTERNAL_KEY_REF=env:HUNTAI_AI_EXTERNAL_KEY
+   HUNTAI_AI_EXTERNAL_KEY=<你的 DeepSeek key>
+   ```
+
+2. 执行配置脚本：
+
+   ```bash
+   bash deploy/scripts/07-configure-ai.sh
+   ```
+
+   脚本会从 `.env` 读取 key，创建/更新 `huntai-ai-secret`，再以
+   `config.aiEgressEnabled=true` 执行 Helm upgrade，并等待 AI worker 就绪。
+   key 不会出现在命令行参数、values、Chart 或日志中。
+
+3. 验证：
+
+   ```bash
+   HUNTAI_AI_MODE=deepseek bash deploy/scripts/05-run-acceptance.sh
+   ```
+
+相关 values：
+
+| 键 | 默认 | 说明 |
+|---|---|---|
+| `config.aiEgressEnabled` | `false` | 出域开关；`07` 会设为 `true` |
+| `config.aiExternalUrl` | `https://api.deepseek.com/v1` | Provider 会追加 `/chat/completions` |
+| `config.aiExternalModel` | `deepseek-chat` | 也可用 `deepseek-reasoner` |
+| `config.aiExternalKeyRef` | `env:HUNTAI_AI_EXTERNAL_KEY` | secret_ref 引用 |
+| `ai.externalKeySecretName` | `huntai-ai-secret` | 由 `07` 创建的集群 Secret |
+| `ai.externalKeySecretKey` | `apiKey` | Secret 中的数据键 |
+
+路由规则：`aiEgressEnabled=true` 且外部 URL/key_ref 完整时，AI 任务走
+`external` Provider；否则走 `local`（不可用时降级 NoAI）。默认仍满足 BR-12「不出域」。
+
+## 7. 代码改动后的重建
 
 ```bash
 # 只改后端
@@ -219,7 +263,7 @@ kubectl -n demo rollout restart deploy/python-inventory-service
 
 注意：`imagePullPolicy` 为 `IfNotPresent`，重新 load 同 tag 后必须 `rollout restart` 才会用新镜像。
 
-## 7. 升级与回滚
+## 8. 升级与回滚
 
 ```bash
 helm list -A
@@ -229,7 +273,7 @@ helm rollback huntai 1 -n huntai
 
 演示业务同理：`helm history huntai-demo -n demo` / `helm rollback huntai-demo <REVISION> -n demo`。
 
-## 8. 下一步
+## 9. 下一步
 
 - [03-feature-acceptance.md](03-feature-acceptance.md)：自动验收与手工体验
 - [04-troubleshooting.md](04-troubleshooting.md)：常见问题

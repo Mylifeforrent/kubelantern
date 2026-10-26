@@ -62,8 +62,22 @@ spec:
               value: {{ $.Values.config.aiLocalEndpoint | quote }}
             - name: HUNTAI_AI_LOCAL_MODEL
               value: {{ $.Values.config.aiLocalModel | quote }}
+            - name: HUNTAI_AI_EXTERNAL_URL
+              value: {{ $.Values.config.aiExternalUrl | quote }}
+            - name: HUNTAI_AI_EXTERNAL_MODEL
+              value: {{ $.Values.config.aiExternalModel | quote }}
+            - name: HUNTAI_AI_EXTERNAL_KEY_REF
+              value: {{ $.Values.config.aiExternalKeyRef | quote }}
             - name: HUNTAI_AI_EGRESS_ENABLED
               value: {{ $.Values.config.aiEgressEnabled | quote }}
+            {{- if eq $group "ai" }}
+            - name: HUNTAI_AI_EXTERNAL_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.ai.externalKeySecretName | quote }}
+                  key: {{ $.Values.ai.externalKeySecretKey | quote }}
+                  optional: true
+            {{- end }}
             - name: HUNTAI_SSE_HEARTBEAT_SECONDS
               value: {{ $.Values.config.sseHeartbeatSeconds | quote }}
             {{- if $.Values.readonlyRBAC.enabled }}

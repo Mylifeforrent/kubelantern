@@ -42,6 +42,7 @@ KUBECTL_CHECK = os.getenv("KUBECTL_CHECK", "1") == "1"
 KIND_CLUSTER_NAME = os.getenv("KIND_CLUSTER_NAME", "huntai-sre")
 DEMO_NAMESPACE = os.getenv("DEMO_NAMESPACE", "demo")
 FAULT_SETTLE_SECONDS = int(os.getenv("FAULT_SETTLE_SECONDS", "45"))
+AI_MODE = os.getenv("HUNTAI_AI_MODE", "noai").strip().lower()
 
 # 隐式拼接避免静态扫描把演示口令当作硬编码凭据。
 LOGIN_USER_FIELD = "user" + "name"
@@ -329,6 +330,7 @@ def main() -> int:
     print(f"API      : {BASE_URL}")
     print(f"Web      : {WEB_URL}")
     print(f"Demo     : {DEMO_CONSOLE_URL}")
+    print(f"AI_MODE  : {AI_MODE}")
     print(f"RUN_ID   : {RUN_ID}")
     print("=" * 78)
 
@@ -595,7 +597,7 @@ def main() -> int:
 
     step("巡检：故障发现与 BR-09 转告警", inspection_flow)
 
-    def ai_noai() -> str:
+    def ai_task() -> str:
         finding = state.get("converted_finding") or next(
             iter(state.get("findings") or []), None
         )
@@ -611,16 +613,48 @@ def main() -> int:
                 return body
             return None
 
-        result = wait_for("AI 任务进入终态", terminal, timeout=90, interval=2)
-        assert result["status"] == "failed", f"未部署模型时应降级 failed，实际 {result['status']}"
-        assert "noai" in (result.get("error") or ""), f"错误信息不含 NoAI：{result.get('error')}"
+        result = wait_for("AI 任务进入终态", terminal, timeout=120, interval=2)
         logs = api.request(
             "GET", f"/ai/tasks/{task['id']}/call-logs?limit=20"
         ).body["items"]
+
+        if AI_MODE in {"deepseek", "external", "complete"}:
+            assert result["status"] == "completed", (
+                f"外部 AI 未完成：status={result['status']} error={result.get('error')}"
+            )
+            assert result["calls_used"] >= 1, f"calls_used={result['calls_used']}"
+            assert result["tokens_used"] > 0, f"tokens_used={result['tokens_used']}"
+            assert logs and logs[0]["result_code"] == "ok", f"调用日志异常：{logs}"
+            assert logs[0]["model"] == "external", f"未走 external Provider：{logs[0]}"
+            alert_id = finding.get("converted_alert_id")
+            if alert_id:
+                explanations = api.request(
+                    "GET", f"/alerts/{alert_id}/explanations?limit=20"
+                ).body["items"]
+                explanation = next(
+                    (item for item in explanations if item.get("task_id") == task["id"]),
+                    None,
+                )
+                assert explanation, "AI 解释未落库到 ai_explanations"
+                output = explanation.get("output") or {}
+                assert not output.get("noai"), f"解释退化为 NoAI：{output}"
+                assert output.get("diagnosis"), f"解释内容为空：{output}"
+            return (
+                f"task={task['id']} status=completed provider=external "
+                f"tokens_out={result['tokens_used']}"
+            )
+
+        assert result["status"] == "failed", f"未部署模型时应降级 failed，实际 {result['status']}"
+        assert "noai" in (result.get("error") or ""), f"错误信息不含 NoAI：{result.get('error')}"
         assert logs and logs[0]["result_code"] in {"error", "noai"}, f"调用日志异常：{logs}"
         return f"task={task['id']} status=failed error={result['error']}"
 
-    step("AI 治理：NoAI 降级与调用留痕", ai_noai)
+    ai_label = (
+        "AI 治理：DeepSeek 外部调用与留痕"
+        if AI_MODE in {"deepseek", "external", "complete"}
+        else "AI 治理：NoAI 降级与调用留痕"
+    )
+    step(ai_label, ai_task)
 
     def sse_flow() -> str:
         return check_sse(api)

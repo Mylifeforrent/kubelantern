@@ -80,7 +80,7 @@ class AIGateway:
         task.status = AITaskStatus.RUNNING
         await session.flush()
 
-        provider = self._providers.get(model_router.route(task.type.value))
+        provider = self._providers.get(model_router.route(task.type.value, self.settings))
         if provider is None or not self.circuit.allow():
             await self._finish_noai(session, task, publish=publish)
             return task

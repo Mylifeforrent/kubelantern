@@ -27,6 +27,10 @@ bash deploy/scripts/05-run-acceptance.sh
 - HuntAI 平台：http://127.0.0.1:8080（`admin` / `your-demo-auth-password`）
 - 演示业务控制台：http://127.0.0.1:18081
 
+外部 AI（可选）：在 `.env` 填写 DeepSeek key 后执行
+`bash deploy/scripts/07-configure-ai.sh`，再用
+`HUNTAI_AI_MODE=deepseek bash deploy/scripts/05-run-acceptance.sh` 验收。
+
 详细说明见 [deploy/README.md](deploy/README.md)，以及：
 
 1. [kind 演示集群](docs/06-release/01-kind-demo-cluster.md)

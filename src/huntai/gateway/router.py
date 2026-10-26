@@ -19,11 +19,21 @@ def build_providers(settings: Settings) -> dict[str, ModelProvider]:
     return providers
 
 
-def route(task_type: str) -> str:
-    """任务类型 → Provider 名：explain 小模型、investigate/workflow_gen 强模型（分级路由）。
+def route(task_type: str, settings: Settings | None = None) -> str:
+    """任务类型 → Provider 名。
 
-    当前仅 local 一个已注册 Provider；external 注册后按 [TBD-BIZ] 默认值切换。
+    只有显式开启出域且外部端点/密钥引用完整时才走 external；否则保持 local。
+    这样默认行为仍满足 BR-12「不出域」，运维配置 DeepSeek 等 OpenAI 兼容端点后
+    AI 任务才会调用外部模型。task_type 预留给后续分级路由（explain 小模型 /
+    investigate 强模型）。
     """
+    if (
+        settings is not None
+        and settings.ai_egress_enabled
+        and settings.ai_external_url
+        and settings.ai_external_key_ref
+    ):
+        return "external"
     return "local"
 
 
