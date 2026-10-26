@@ -9,6 +9,7 @@ import { useSessionStore, useRole } from '../../features/session'
 import { GlobalSearch } from '../global-search'
 import { AiStatusBanner } from '../ai-status-banner'
 import { Icon, type IconName } from '../../shared/ui/icon'
+import { BrandLogo } from '../../shared/ui/brand-logo'
 import { Bdg } from '../../shared/ui/chips'
 import { logout } from '../../features/session/api'
 
@@ -138,12 +139,10 @@ export function AppShell(): JSX.Element {
     <div className="h-full flex" style={{ position: 'relative' }}>
       <aside className="side">
         <div className="logo">
-          <span className="logo-mark">
-            <Icon name="eye2" size={17} />
-          </span>
+          <BrandLogo size={30} className="logo-mark" />
           <div>
-            <b>HuntAI SRE</b>
-            <small>Kubernetes 智能运维平台</small>
+            <b>KubeLantern</b>
+            <small>Kubernetes SRE 智能运维平台</small>
           </div>
         </div>
         {GROUPS.map((g) => {

@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="KubeLantern">
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#F0643C"/><stop offset="0.52" stop-color="#C53520"/><stop offset="1" stop-color="#8B1B0F"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="15" fill="url(#tile)"/>
+  <path d="M25.5 14.5h13" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+  <path d="M27.8 14.5v-1.6a4.2 4.2 0 0 1 8.4 0v1.6" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+  <path d="M21.5 17.5h21l-2.3 5.2H23.8z" fill="#fff"/>
+  <path d="M24 22.7h16l-1.8 21a4.7 4.7 0 0 1-4.7 4.2h-3a4.7 4.7 0 0 1-4.7-4.2z" fill="#fff"/>
+  <circle cx="32" cy="34" r="6.2" fill="#F2CC60"/>
+  <circle cx="32" cy="34" r="3" fill="#FFF3C4"/>
+  <path d="M25.5 51.4h13" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+</svg>

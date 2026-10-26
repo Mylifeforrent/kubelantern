@@ -168,9 +168,7 @@ function CandidateCard({ candidate }: { candidate: IncidentCandidate }): JSX.Ele
   const { data: alertsRes } = useQuery({
     queryKey: ['candidate-members', candidate.member_alert_ids],
     queryFn: async () => {
-      const res = await api.GET('/alerts', {
-        params: { query: { limit: 200, fingerprint: '' } },
-      })
+      const res = await api.GET('/alerts', { params: { query: { limit: 200 } } })
       return unwrap(res)
     },
   })

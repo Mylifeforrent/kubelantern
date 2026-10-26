@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="256" height="256" role="img" aria-label="KubeLantern mark">
+  <path d="M25.5 14.5h13" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>
+  <path d="M27.8 14.5v-1.6a4.2 4.2 0 0 1 8.4 0v1.6" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>
+  <path d="M22.3 17.8h19.4l-2.1 4.8H24.4z" fill="currentColor"/>
+  <path d="M24.4 22.6h15.2l-1.7 20.7a4.7 4.7 0 0 1-4.7 4.2h-2.4a4.7 4.7 0 0 1-4.7-4.2z" fill="currentColor"/>
+  <path d="M27.7 26.2h8.6l-.9 15.1a2.35 2.35 0 0 1-2.35 2.2h-2.1a2.35 2.35 0 0 1-2.35-2.2z" fill="#C53520"/>
+  <g stroke="#F2CC60" stroke-width="1.6" stroke-linecap="round">
+    <circle cx="32" cy="35" r="4.8" fill="none"/>
+    <circle cx="32" cy="35" r="1.35" fill="#F2CC60" stroke="none"/>
+    <path d="M32 30.2v2.6M32 37.2v2.6M27.2 35h2.6M34.2 35h2.6M28.6 31.6l1.85 1.85M33.55 36.55l1.85 1.85M35.4 31.6l-1.85 1.85M30.45 36.55l-1.85 1.85"/>
+  </g>
+  <path d="M26.2 51.4h11.6" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>
+</svg>

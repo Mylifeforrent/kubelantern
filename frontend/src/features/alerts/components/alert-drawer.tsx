@@ -177,7 +177,19 @@ export function AlertDetailDrawer(): JSX.Element | null {
                 }
               >
                 <div className="flex flex-col gap-2">
-                  <div>{typeof e.output.summary === 'string' ? e.output.summary : ''}</div>
+                  {e.output.noai === true ? (
+                    <div className="text-tx2">
+                      NoAI 降级：当前模型不可用或已熔断，已保留原始错误供人工排障。
+                    </div>
+                  ) : (
+                    <div className="whitespace-pre-wrap text-[12.5px] leading-relaxed">
+                      {typeof e.output.diagnosis === 'string'
+                        ? e.output.diagnosis
+                        : typeof e.output.summary === 'string'
+                          ? e.output.summary
+                          : ''}
+                    </div>
+                  )}
                   {Array.isArray(e.output.suggestions) && (
                     <ul className="list-disc pl-5 flex flex-col gap-1">
                       {e.output.suggestions.map((s, i) => (

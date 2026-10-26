@@ -45,8 +45,8 @@ export function InspectionsPage(): JSX.Element {
   const stats = useMemo(() => {
     const open = findings.filter((f) => f.status === 'open').length
     const acked = findings.filter((f) => ['acknowledged', 'in_progress'].includes(f.status)).length
-    const explained = findings.filter((f) => f.status === 'resolved' || f.converted_alert_id).length
-    return { open, acked, explained }
+    const converted = findings.filter((f) => f.converted_alert_id).length
+    return { open, acked, converted }
   }, [findings])
 
   const trend = useMemo(() => {
@@ -191,7 +191,12 @@ export function InspectionsPage(): JSX.Element {
         />
         <StatCard label="Open findings" icon="warn" value={stats.open} sub="待认领处置" />
         <StatCard label="处置中" icon="check" value={stats.acked} sub="已认领 / 处理中" />
-        <StatCard label="AI 已解释" icon="spark" value={stats.explained} sub="A1 链路产出" />
+        <StatCard
+          label="已转告警"
+          icon="siren"
+          value={stats.converted}
+          sub="warning 及以上（BR-09）"
+        />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">

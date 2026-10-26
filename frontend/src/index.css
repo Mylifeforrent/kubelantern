@@ -126,21 +126,25 @@ body {
   border: 3px solid var(--color-background);
 }
 
-button {
-  font: inherit;
-  color: inherit;
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 0;
-}
+/* 基础重置必须放在 base 层：组件层（@layer components）里的 .btn/.nav 等
+   需要覆盖按钮与链接的默认外观；未分层规则会压过组件层，导致主按钮失去品牌色。 */
+@layer base {
+  button {
+    font: inherit;
+    color: inherit;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+  }
 
-a {
-  color: var(--color-info);
-  text-decoration: none;
-}
-a:hover {
-  text-decoration: underline;
+  a {
+    color: var(--color-info);
+    text-decoration: none;
+  }
+  a:hover {
+    text-decoration: underline;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1175,15 +1179,9 @@ a:hover {
     padding: 14px 16px 12px;
   }
   .logo-mark {
-    width: 30px;
-    height: 30px;
-    border-radius: 9px;
     flex: none;
-    display: grid;
-    place-items: center;
-    background: linear-gradient(135deg, #e6522c, #c53520 55%, #8f1e12);
-    color: #fff;
-    box-shadow: 0 2px 8px rgba(197, 53, 32, 0.25);
+    display: block;
+    filter: drop-shadow(0 2px 6px rgba(197, 53, 32, 0.22));
   }
   .logo b {
     font-size: 14.5px;

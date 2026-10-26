@@ -6,7 +6,7 @@ import { useNavigate, useSearchParams } from 'react-router'
 import { login } from './api'
 import { Button } from '../../shared/ui/button'
 import { Input, Label } from '../../shared/ui/inputs'
-import { Icon } from '../../shared/ui/icon'
+import { BrandLogo } from '../../shared/ui/brand-logo'
 import { describeProblem } from '../../shared/api/problem'
 
 const schema = z.object({
@@ -41,11 +41,9 @@ export function LoginForm(): JSX.Element {
     <div className="h-full grid place-items-center">
       <form onSubmit={(e) => void onSubmit(e)} className="card w-[360px] p-6" noValidate>
         <div className="flex items-center gap-3 mb-5">
-          <span className="logo-mark">
-            <Icon name="eye2" size={17} />
-          </span>
+          <BrandLogo size={34} className="logo-mark" />
           <div>
-            <b className="text-[15px] text-foreground block">HuntAI SRE</b>
+            <b className="text-[15px] text-foreground block">KubeLantern</b>
             <span className="tiny text-tx2">Kubernetes SRE 智能运维平台</span>
           </div>
         </div>

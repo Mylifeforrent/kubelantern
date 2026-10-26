@@ -79,11 +79,11 @@ export default function App() {
     <main>
       <div className="hero">
         <div>
-          <p className="eyebrow">HuntAI SRE · kind demo</p>
+          <p className="eyebrow">KubeLantern · kind demo</p>
           <h1>业务服务控制台</h1>
           <p className="lead">
             这是部署在 kind 集群中的 React 演示应用。它会经 nginx 同源代理探测 Java 与 Python 服务，
-            并可主动触发 5xx / 慢请求，供 HuntAI 告警与巡检演示使用。
+            并可主动触发 5xx / 慢请求，供 KubeLantern 告警与巡检演示使用。
           </p>
         </div>
         <button className="primary" onClick={() => void refresh()}>
@@ -118,7 +118,7 @@ export default function App() {
       </section>
 
       <footer>
-        <span>HuntAI 平台入口：<a href="http://localhost:8080">http://localhost:8080</a></span>
+        <span>KubeLantern 平台入口：<a href="http://localhost:8080">http://localhost:8080</a></span>
         <span>故障注入由 Helm values 控制：faults.enabled=true</span>
       </footer>
     </main>

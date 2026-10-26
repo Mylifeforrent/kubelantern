@@ -1,4 +1,4 @@
-# huntai-sre — 项目规则
+# KubeLantern — 项目规则
 
 ## 语言与技术栈
 

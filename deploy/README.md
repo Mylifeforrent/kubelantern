@@ -1,8 +1,8 @@
-# HuntAI SRE · 本地 kind 演示环境
+# KubeLantern · 本地 kind 演示环境
 
-本目录把 HuntAI SRE 平台、3 个演示业务工程（Java / Python / React）和故障注入场景打包成一套**可重复、可验证、可清理**的本地环境，用于：
+本目录把 KubeLantern 平台、3 个演示业务工程（Java / Python / React）和故障注入场景打包成一套**可重复、可验证、可清理**的本地环境，用于：
 
-- 新同学从零体验 HuntAI 的告警、巡检、事件、AI 治理、SSE 与权限能力；
+- 新同学从零体验 KubeLantern 的告警、巡检、事件、AI 治理、SSE 与权限能力；
 - 开发自测前后端联调；
 - 面试/演示时快速搭建一套真实 Kubernetes 环境。
 
@@ -16,7 +16,7 @@
 bash deploy/scripts/00-prereqs.sh       # 检查工具、端口
 bash deploy/scripts/01-create-cluster.sh # 3 节点 kind 集群
 bash deploy/scripts/02-build-images.sh   # 构建 5 个镜像并 kind load
-bash deploy/scripts/03-deploy-platform.sh # Helm 部署 HuntAI 平台
+bash deploy/scripts/03-deploy-platform.sh # Helm 部署 KubeLantern 平台
 bash deploy/scripts/04-deploy-demo.sh     # Helm 部署演示业务（含故障）
 bash deploy/scripts/05-run-acceptance.sh  # 端到端验收
 ```
@@ -25,9 +25,9 @@ bash deploy/scripts/05-run-acceptance.sh  # 端到端验收
 
 | 入口 | 地址 | 说明 |
 |---|---|---|
-| HuntAI 平台 | http://127.0.0.1:8080 | 用 `admin` / `your-demo-auth-password` 登录 |
+| KubeLantern 平台 | http://127.0.0.1:8080 | 用 `admin` / `your-demo-auth-password` 登录 |
 | 演示业务控制台 | http://127.0.0.1:18081 | React 页面，可探测 Java/Python 服务并触发 5xx |
-| 演示告警源 | 每 2 分钟自动上报 | 由 `demo-alert-reporter` CronJob 调用 HuntAI webhook |
+| 演示告警源 | 每 2 分钟自动上报 | 由 `demo-alert-reporter` CronJob 调用 KubeLantern webhook |
 
 演示账号（口令均为 `your-demo-auth-password`，可在 Helm values 覆盖）：
 

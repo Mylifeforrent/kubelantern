@@ -216,7 +216,10 @@ export function AiTasksPage(): JSX.Element {
         <ApprovalModal
           task={approving}
           onClose={() => setApproving(null)}
-          onDecide={(id, ok) => (ok ? actions.approve.mutate(id) : actions.cancel.mutate(id))}
+          onDecide={(id, ok) => {
+            const mutation = ok ? actions.approve : actions.cancel
+            mutation.mutate(id, { onSuccess: () => setApproving(null) })
+          }}
         />
       )}
       {callLogOf && <CallLogModal task={callLogOf} onClose={() => setCallLogOf(null)} />}

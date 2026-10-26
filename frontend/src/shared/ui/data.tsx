@@ -201,7 +201,7 @@ export function RuleBox({
   ruleCode: string
   description: string
   window_: string
-  similarity?: number
+  similarity?: number | null
   children?: ReactNode
 }): JSX.Element {
   return (
@@ -209,7 +209,7 @@ export function RuleBox({
       <div>
         命中规则 <b>{ruleCode}</b> · {description} · 时间窗 {window_}
       </div>
-      {similarity !== undefined && (
+      {similarity != null && (
         <div className="flex items-center gap-2 mt-2">
           <span
             className="simbar"
