@@ -62,6 +62,8 @@ def test_settings():
         redis_url=TEST_REDIS_URL,
         dev_auth_password="test-password",
         auth_secret="test-auth-secret-material",
+        # Settings 会读取仓库根 .env；测试固定走 local Provider，避免真实外部调用。
+        ai_egress_enabled=False,
     )
 
 

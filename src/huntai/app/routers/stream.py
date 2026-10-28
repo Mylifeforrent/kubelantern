@@ -6,10 +6,11 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
 
 from huntai.app.deps import get_current_user
+from huntai.app.routing import TransactionalAPIRoute
 from huntai.core.security import Principal
 from huntai.realtime.hub import TOPICS
 
-router = APIRouter()
+router = APIRouter(route_class=TransactionalAPIRoute)
 
 
 @router.get("/realtime/stream")

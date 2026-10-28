@@ -450,11 +450,12 @@ curl -s http://127.0.0.1:18081/python/api/inventory
   <h2><span class="num">05</span>一键验收：先确认环境没有坏</h2>
   <p class="sub">验收脚本是纯标准库 Python，会等故障资源进入目标状态，然后跑 14 项检查。它是后续手工测试的基线。</p>
   <h3>5.1 运行验收</h3>
-  <div class="code-block"><div class="code-head">bash · 默认 NoAI 模式</div><pre><code>bash deploy/scripts/05-run-acceptance.sh
+  <div class="code-block"><div class="code-head">bash · 默认自动识别 AI 口径</div><pre><code>bash deploy/scripts/05-run-acceptance.sh
 </code></pre></div>
-  <div class="code-block"><div class="code-head">bash · 已配置 DeepSeek 时</div><pre><code>HUNTAI_AI_MODE=deepseek bash deploy/scripts/05-run-acceptance.sh
+  <div class="code-block"><div class="code-head">bash · 显式指定 AI 口径（可选）</div><pre><code>HUNTAI_AI_MODE=deepseek bash deploy/scripts/05-run-acceptance.sh
+HUNTAI_AI_MODE=noai     bash deploy/scripts/05-run-acceptance.sh
 </code></pre></div>
-  <div class="callout danger"><b>验收模式必须与 AI 路由一致</b>默认脚本假设环境没有模型，AI 项断言任务最终是 <code>failed</code> + <code>noai</code>。如果你的环境已经按 <code>07-configure-ai.sh</code> 打开了 DeepSeek，却仍用默认模式跑，AI 项会因为任务实际 <code>completed</code> 而失败——这不是功能坏了，是验收口径不匹配。先查当前模式：<div class="code-block" style="margin-top:10px"><div class="code-head">bash · 查 AI 出域开关</div><pre><code>kubectl -n huntai get deploy huntai-worker-ai \
+  <div class="callout why"><b>默认会自动识别</b>未显式设置 <code>HUNTAI_AI_MODE</code> 时，脚本读取 <code>huntai-worker-ai</code> 的 <code>HUNTAI_AI_EGRESS_ENABLED</code>：为 <code>true</code> 断言外部模型任务 <code>completed</code>，否则断言 NoAI 降级 <code>failed</code> + <code>noai</code>。只有需要覆盖自动判断（例如临时验证另一条路径）时才显式指定。当前环境实际值可以这样查：<div class="code-block" style="margin-top:10px"><div class="code-head">bash · 查 AI 出域开关</div><pre><code>kubectl -n huntai get deploy huntai-worker-ai \
   -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="HUNTAI_AI_EGRESS_ENABLED")].value}{"\n"}'
 </code></pre></div></div>
   <h3>5.2 14 项检查覆盖什么</h3>
@@ -483,7 +484,7 @@ curl -s http://127.0.0.1:18081/python/api/inventory
     <tr><td><code>HUNTAI_USERNAME</code> / <code>HUNTAI_PASSWORD</code></td><td>admin / your-demo-auth-password</td><td>验收账号</td></tr>
     <tr><td><code>KUBECTL_CHECK</code></td><td><code>1</code></td><td>设 0 跳过 Docker/kubectl 检查</td></tr>
     <tr><td><code>FAULT_SETTLE_SECONDS</code></td><td><code>45</code></td><td>跳过 kubectl 检查时等待故障的时间</td></tr>
-    <tr><td><code>HUNTAI_AI_MODE</code></td><td><code>noai</code></td><td>设为 <code>deepseek</code> 时断言外部模型任务 completed</td></tr>
+    <tr><td><code>HUNTAI_AI_MODE</code></td><td><code>auto</code></td><td>自动读取 AI 出域开关；也可显式设为 <code>deepseek</code> / <code>noai</code></td></tr>
   </tbody></table></div>
   <h3>5.4 为什么验收要等 45 秒</h3>
   <p class="mini">CrashLoopBackOff 不是“一启动就进入”的：容器要先失败若干次，Kubernetes 的退避窗口才会拉长。验收脚本甚至要求 restartCount ≥ 5 才算稳定，否则巡检快照可能恰好落在容器短暂 Running 的毫秒级窗口里，导致漏检。ImagePullBackOff 也需要节点实际尝试拉取后才会出现。</p>
@@ -966,9 +967,10 @@ HUNTAI_AI_EXTERNAL_KEY=sk-xxxx
 </code></pre></div>
   <div class="code-block"><div class="code-head">bash · 创建 Secret 并开启外部路由</div><pre><code>bash deploy/scripts/07-configure-ai.sh
 </code></pre></div>
-  <div class="code-block"><div class="code-head">bash · 验证</div><pre><code>kubectl -n huntai get secret huntai-ai-secret
+  <div class="code-block"><div class="code-head">bash · 验证（05 会自动识别为 deepseek，显式指定亦可）</div><pre><code>kubectl -n huntai get secret huntai-ai-secret
 kubectl -n huntai rollout status deploy/huntai-worker-ai --timeout=180s
-HUNTAI_AI_MODE=deepseek bash deploy/scripts/05-run-acceptance.sh
+bash deploy/scripts/05-run-acceptance.sh
+# 或：HUNTAI_AI_MODE=deepseek bash deploy/scripts/05-run-acceptance.sh
 </code></pre></div>
   <div class="callout verify"><b>预期</b>AI 任务最终 <code>completed</code>；<code>calls_used ≥ 1</code>、<code>tokens_used &gt; 0</code>；调用链 <code>model=external</code>、<code>result_code=ok</code>；告警解释接口返回的 <code>output.diagnosis</code> 非空，且不含 <code>noai</code>。</div>
   <h3>11.5 脱敏到底做了什么？</h3>

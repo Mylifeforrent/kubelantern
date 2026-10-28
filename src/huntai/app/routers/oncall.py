@@ -7,6 +7,7 @@ from fastapi import status as http_status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from huntai.app.deps import get_current_user, get_session, require_permission
+from huntai.app.routing import TransactionalAPIRoute
 from huntai.core.errors import not_found
 from huntai.core.pagination import clamp_page
 from huntai.core.security import Principal, TeamScope
@@ -36,7 +37,7 @@ from huntai.domains.workflows.service import (
     WorkflowVersionCreateRequest,
 )
 
-router = APIRouter()
+router = APIRouter(route_class=TransactionalAPIRoute)
 
 
 def _schedule_response(s) -> OnCallScheduleResponse:

@@ -9,6 +9,7 @@ from fastapi import status as http_status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from huntai.app.deps import get_current_user, get_session, require_permission
+from huntai.app.routing import TransactionalAPIRoute
 from huntai.core.errors import ProblemError, not_found
 from huntai.core.pagination import clamp_page
 from huntai.core.security import Principal, TeamScope
@@ -39,7 +40,7 @@ from huntai.domains.alerts.schemas import (
 from huntai.domains.clusters import repository as clusters_repo
 from huntai.domains.incidents.schemas import IncidentResponse
 
-router = APIRouter()
+router = APIRouter(route_class=TransactionalAPIRoute)
 
 
 def _publish(request: Request):

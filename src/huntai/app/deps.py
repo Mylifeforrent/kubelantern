@@ -16,14 +16,22 @@ from huntai.core.security import Principal, TeamScope
 
 
 async def get_session(request: Request) -> AsyncIterator[AsyncSession]:
+    """请求级事务：成功提交、异常回滚。
+
+    写请求的提前提交由 TransactionalAPIRoute 在响应发送前完成（见 app/routing.py），
+    这里处理兜底提交/回滚与连接释放。
+    """
     session = request.app.state.sessionmaker()
+    request.state.db_session = session
     try:
         yield session
-        await session.commit()
+        if not getattr(request.state, "db_session_committed", False):
+            await session.commit()
     except Exception:
         await session.rollback()
         raise
     finally:
+        request.state.db_session = None
         await session.close()
 
 

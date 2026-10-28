@@ -72,4 +72,4 @@ log "等待 AI worker 就绪"
 kubectl -n "${PLATFORM_NAMESPACE}" rollout status deploy/huntai-worker-ai --timeout=180s
 
 ok "外部 AI 已配置。下一步："
-ok "  HUNTAI_AI_MODE=deepseek bash deploy/scripts/05-run-acceptance.sh"
+ok "  bash deploy/scripts/05-run-acceptance.sh（自动识别为 deepseek 口径）"

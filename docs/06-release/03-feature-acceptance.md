@@ -11,11 +11,11 @@
 bash deploy/scripts/05-run-acceptance.sh
 ```
 
-脚本会先等 Java/Python/React 三个 Deployment 可用、再等 45 秒让故障资源进入目标状态，然后运行 14 项检查。全部通过时输出类似：
+脚本会先等 Java/Python/React 三个 Deployment 可用、再等 45 秒让故障资源进入目标状态，然后运行 14 项检查。AI 口径默认自动识别：开启外部出域时断言 DeepSeek 任务 `completed`，否则断言 NoAI 降级 `failed`。全部通过时输出类似：
 
 ```text
 ==============================================================================
-HuntAI SRE · kind 端到端功能验收
+KubeLantern · kind 端到端功能验收
 API      : http://127.0.0.1:8080/api/v1
 ...
 [PASS] K8s：3 节点集群与故障资源 — 3 个 Docker 容器 / 3 个 Ready 节点：...
@@ -26,7 +26,7 @@ API      : http://127.0.0.1:8080/api/v1
 [PASS] 告警工作台：误报建议 / ACK / 关闭 — ...
 [PASS] 事件：关联候选 -> 确认转事件 — rule=... candidate=... -> incident=...
 [PASS] 巡检：故障发现与 BR-09 转告警 — run=... findings=... 覆盖 5 类规则
-[PASS] AI 治理：NoAI 降级与调用留痕 — task=... status=failed error=noai: ...
+[PASS] AI 治理：DeepSeek 外部调用与留痕 — task=... status=completed provider=external ...
 [PASS] 实时通道：SSE alert.updated — 收到 ... 个 alert.updated 事件
 [PASS] 值班：排班与升级策略 CRUD — schedule=... policy=...
 [PASS] 演示业务：React -> Java/Python — ...
@@ -51,7 +51,7 @@ API      : http://127.0.0.1:8080/api/v1
 | `FAULT_SETTLE_SECONDS` | `45` | 跳过 kubectl 检查时等待故障的时间 |
 | `KIND_CLUSTER_NAME` | `huntai-sre` | kind 集群名 |
 | `DEMO_NAMESPACE` | `demo` | 演示命名空间 |
-| `HUNTAI_AI_MODE` | `noai` | 设为 `deepseek` 时断言外部模型任务 `completed` |
+| `HUNTAI_AI_MODE` | `auto` | 自动读取部署的 AI 出域开关；也可显式设为 `deepseek` / `noai` |
 
 ## 2. 自动验收覆盖了什么
 
@@ -65,7 +65,7 @@ API      : http://127.0.0.1:8080/api/v1
 | 6 | 告警工作台 | 误报建议、ACK、关闭 | `accepted=true`、`acknowledged_at` 写入、关闭后 `status=resolved` |
 | 7 | 事件闭环 | BR-04 关联 → 候选 → 确认 | 两条同 namespace 告警生成候选，确认后 incident.source=correlation |
 | 8 | 巡检 | 快照、规则、finding、BR-09 | 命中 5 类故障规则，且 finding 已转告警 |
-| 9 | AI 治理 | NoAI 降级 / DeepSeek 外部调用、预算/调用留痕 | 默认未部署模型时 `failed` + `noai`；`HUNTAI_AI_MODE=deepseek` 时 `completed`、call-log 为 ok、解释落库 |
+| 9 | AI 治理 | NoAI 降级 / DeepSeek 外部调用、预算/调用留痕 | 自动识别口径：未部署模型时 `failed` + `noai`；开启外域时 `completed`、call-log 为 ok、解释落库 |
 | 10 | SSE | 实时事件通道 | 订阅后收到 `alert.updated` |
 | 11 | 值班 | P2 排班/升级策略 | 排班与两级升级策略创建、列表可读 |
 | 12 | 演示业务 | React → Java/Python | 控制台 200、两个服务 JSON、5xx 端点返回 500 |
@@ -187,7 +187,8 @@ curl -s -X POST http://127.0.0.1:8080/api/v1/correlation-rules \
 ```bash
 # .env 中填写 HUNTAI_AI_EXTERNAL_KEY，然后：
 bash deploy/scripts/07-configure-ai.sh
-HUNTAI_AI_MODE=deepseek bash deploy/scripts/05-run-acceptance.sh
+bash deploy/scripts/05-run-acceptance.sh   # 自动识别为 deepseek 口径
+# 或显式指定：HUNTAI_AI_MODE=deepseek bash deploy/scripts/05-run-acceptance.sh
 ```
 
 预期：

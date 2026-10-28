@@ -123,10 +123,11 @@ bash deploy/scripts/06-teardown.sh
    脚本从 `.env` 读取 key，创建 `huntai/huntai-ai-secret`，再执行 Helm upgrade；
    key 不会打印到终端，也不会写入 values/Chart。
 
-3. 用 DeepSeek 模式验收：
+3. 跑验收（默认自动识别为 deepseek 口径；也可显式指定）：
 
    ```bash
-   HUNTAI_AI_MODE=deepseek bash deploy/scripts/05-run-acceptance.sh
+   bash deploy/scripts/05-run-acceptance.sh
+   # 或：HUNTAI_AI_MODE=deepseek bash deploy/scripts/05-run-acceptance.sh
    ```
 
    AI 步骤应显示 `status=completed provider=external`，并能在 AI 任务详情看到

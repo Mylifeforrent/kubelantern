@@ -7,6 +7,7 @@ from fastapi import status as http_status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from huntai.app.deps import get_current_user, get_session, require_permission
+from huntai.app.routing import TransactionalAPIRoute
 from huntai.core.pagination import clamp_page
 from huntai.core.security import Principal
 from huntai.domains.alerts import repository as alerts_repo
@@ -27,7 +28,7 @@ from huntai.domains.clusters.schemas import (
     ConnectionTestResultResponse,
 )
 
-router = APIRouter()
+router = APIRouter(route_class=TransactionalAPIRoute)
 
 
 def _cluster_response(c) -> ClusterResponse:

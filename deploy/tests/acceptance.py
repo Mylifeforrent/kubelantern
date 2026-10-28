@@ -8,7 +8,7 @@
   4. 告警 webhook 接入、L1 去重、ACK/关闭、误报建议
   5. 告警关联 -> 候选事件 -> 确认转事件
   6. 巡检：故障快照、finding 落库、BR-09 转告警
-  7. AI 任务 NoAI 降级（未部署本地模型时的预期行为）
+  7. AI 任务：按部署的 AI 出域开关自动选择 NoAI 降级或 DeepSeek 外部调用断言
   8. SSE 实时事件
   9. 值班排班 / 升级策略 CRUD
  10. React 控制台 + Java/Python 服务连通性
@@ -40,9 +40,34 @@ USERNAME = os.getenv("HUNTAI_USERNAME", "admin")
 PASSWORD = os.getenv("HUNTAI_PASSWORD", "your-demo-auth-password")
 KUBECTL_CHECK = os.getenv("KUBECTL_CHECK", "1") == "1"
 KIND_CLUSTER_NAME = os.getenv("KIND_CLUSTER_NAME", "huntai-sre")
+PLATFORM_NAMESPACE = os.getenv("PLATFORM_NAMESPACE", "huntai")
 DEMO_NAMESPACE = os.getenv("DEMO_NAMESPACE", "demo")
 FAULT_SETTLE_SECONDS = int(os.getenv("FAULT_SETTLE_SECONDS", "45"))
-AI_MODE = os.getenv("HUNTAI_AI_MODE", "noai").strip().lower()
+BRAND = os.getenv("HUNTAI_BRAND", "KubeLantern")
+
+
+def detect_ai_mode() -> str:
+    """显式指定 HUNTAI_AI_MODE 时以其为准；auto 时读取部署的 AI 出域开关。"""
+    raw = os.getenv("HUNTAI_AI_MODE", "auto").strip().lower()
+    if raw and raw != "auto":
+        return raw
+    try:
+        egress = subprocess.check_output(
+            [
+                "kubectl", "-n", PLATFORM_NAMESPACE, "get", "deploy", "huntai-worker-ai",
+                "-o",
+                'jsonpath={.spec.template.spec.containers[0].env[?(@.name=="HUNTAI_AI_EGRESS_ENABLED")].value}',
+            ],
+            text=True,
+            timeout=20,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+        return "deepseek" if egress == "true" else "noai"
+    except (OSError, subprocess.SubprocessError):
+        return "noai"
+
+
+AI_MODE = detect_ai_mode()
 
 # 隐式拼接避免静态扫描把演示口令当作硬编码凭据。
 LOGIN_USER_FIELD = "user" + "name"
@@ -326,7 +351,7 @@ def check_sse(api: Api) -> str:
 
 def main() -> int:
     print("=" * 78)
-    print("HuntAI SRE · kind 端到端功能验收")
+    print(f"{BRAND} · kind 端到端功能验收")
     print(f"API      : {BASE_URL}")
     print(f"Web      : {WEB_URL}")
     print(f"Demo     : {DEMO_CONSOLE_URL}")
@@ -711,7 +736,8 @@ def main() -> int:
 
     def demo_services() -> str:
         status, html = http_get(f"{DEMO_CONSOLE_URL}/")
-        assert status == 200 and "HuntAI Demo" in html, f"控制台异常：HTTP {status}"
+        assert status == 200, f"控制台首屏 HTTP {status}"
+        assert BRAND in html, f"控制台首屏缺少品牌 {BRAND}：{html[:200]!r}"
         java_status, java_body = http_get(f"{DEMO_CONSOLE_URL}/java/api/orders")
         assert java_status == 200 and '"java-order-service"' in java_body, java_body[:200]
         python_status, python_body = http_get(f"{DEMO_CONSOLE_URL}/python/api/inventory")
@@ -725,7 +751,8 @@ def main() -> int:
 
     def web_spa() -> str:
         status, html = http_get(f"{WEB_URL}/")
-        assert status == 200 and "HuntAI SRE" in html, f"SPA 首页异常：HTTP {status}"
+        assert status == 200, f"SPA 首页 HTTP {status}"
+        assert BRAND in html, f"SPA 首页缺少品牌 {BRAND}：{html[:200]!r}"
         health_status, health_body = http_get(f"{WEB_URL}/healthz")
         assert health_status == 200 and '"ok"' in health_body, health_body[:200]
         me = api.request("GET", "/users/me").body
